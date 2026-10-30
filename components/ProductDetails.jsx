@@ -250,8 +250,8 @@ export default function ProductDetails({ product: initialProduct, similarProduct
                       src={similarProduct.src}
                       alt={similarProduct.name}
                       tone={similarProduct.tone}
-                      className="aspect-square w-full sm:h-[250px] sm:aspect-auto"
-                      imgClassName="h-full w-full object-contain transition duration-700 group-hover:scale-105"
+                      className="aspect-square w-full"
+                      imgClassName="h-full w-full object-cover transition duration-700 group-hover:scale-105"
                     />
                   </a>
                   <div className="p-3 sm:p-5">
