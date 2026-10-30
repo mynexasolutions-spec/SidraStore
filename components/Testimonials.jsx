@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BadgeCheck, ChevronLeft, ChevronRight, Quote, ShoppingBag, Star, StarHalf } from "lucide-react";
 import SmartImage from "./SmartImage";
 import Reveal from "./Reveal";
-import { testimonials } from "@/lib/data";
+import { subscribeToStorefrontUpdates } from "@/lib/storefrontSync";
 
 const SPEED = 45; // px per second
 const STEP = 400; // px moved by an arrow click
@@ -70,7 +70,7 @@ function Card({ t }) {
             <span className="truncate">{t.name}</span>
             <BadgeCheck size={17} className="shrink-0 text-gold-dark" />
           </p>
-          <p className="text-sm text-stone-500">{t.place}</p>
+      <p className="text-sm text-stone-500">{t.place || "Verified customer review"}</p>
         </div>
       </div>
     </article>
@@ -78,11 +78,38 @@ function Card({ t }) {
 }
 
 export default function Testimonials() {
+  const [reviews, setReviews] = useState([]);
+  const [loading, setLoading] = useState(true);
   const trackRef = useRef(null);
   const s = useRef({ pos: 0, target: null, half: 0, paused: false, dragging: false, startX: 0, startPos: 0 });
 
   useEffect(() => {
+    let mounted = true;
+    const loadReviews = async () => {
+      try {
+        const response = await fetch("/api/storefront/reviews", { cache: "no-store" });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Unable to load customer reviews.");
+        if (mounted) setReviews(result.reviews || []);
+      } catch {
+        if (mounted) setReviews([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    loadReviews();
+    const unsubscribe = subscribeToStorefrontUpdates(loadReviews);
+    const interval = window.setInterval(loadReviews, 10000);
+    return () => {
+      mounted = false;
+      unsubscribe();
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
     const track = trackRef.current;
+    if (!track) return undefined;
     const st = s.current;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const measure = () => (st.half = track.scrollWidth / 2);
@@ -143,7 +170,10 @@ export default function Testimonials() {
   };
   const onUp = () => (s.current.dragging = false);
 
-  const items = [...testimonials, ...testimonials];
+  if (loading) return <section className="bg-cream py-16 text-center text-sm text-stone-500 sm:py-24">Loading customer reviews...</section>;
+  if (!reviews.length) return <section className="bg-cream py-16 text-center text-sm text-stone-500 sm:py-24">No approved customer reviews yet.</section>;
+
+  const items = [...reviews, ...reviews];
 
   return (
     <section className="relative overflow-hidden bg-cream py-16 sm:py-24">

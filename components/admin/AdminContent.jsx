@@ -5,6 +5,7 @@ import { Eye, Image as ImageIcon, MessageCircleQuestion, Megaphone, Plus, Save, 
 import SmartImage from "@/components/SmartImage";
 import CatalogDialog from "./CatalogDialog";
 import { notifyStorefrontUpdate } from "@/lib/storefrontSync";
+import { ReviewStars } from "@/components/ReviewSummary";
 
 const inputClass = "mt-2 h-11 w-full rounded-xl border border-stone-200 bg-white px-3 text-sm font-normal outline-none focus:border-gold focus:ring-4 focus:ring-gold/10";
 
@@ -134,12 +135,97 @@ export function AdminReviews() {
   const [reviews, setReviews] = useState([]);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  async function load() { setLoading(true); const response = await fetch("/api/admin/reviews", { cache: "no-store" }); const result = await response.json(); setLoading(false); if (!response.ok) return setError(result.error || "Unable to load reviews."); setReviews(result.reviews); setError(""); }
+  async function load() {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/admin/reviews", { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Unable to load reviews.");
+      setReviews(result.reviews || []);
+      setError("");
+    } catch (loadError) {
+      setError(loadError.message);
+    } finally {
+      setLoading(false);
+    }
+  }
   useEffect(() => { load(); }, []);
-  async function update(isApproved) { const response = await fetch(`/api/admin/reviews/${selected.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_approved: isApproved }) }); const result = await response.json(); if (!response.ok) return setError(result.error || "Unable to update review."); notifyStorefrontUpdate("catalog"); setSelected({ ...selected, is_approved: isApproved }); await load(); }
-  async function remove() { if (!window.confirm("Delete this review?")) return; const response = await fetch(`/api/admin/reviews/${selected.id}`, { method: "DELETE" }); const result = await response.json(); if (!response.ok) return setError(result.error || "Unable to delete review."); notifyStorefrontUpdate("catalog"); setSelected(null); await load(); }
-  return <section className="overflow-hidden rounded-2xl border bg-white shadow-sm"><div className="border-b px-5 py-5 sm:px-7"><p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gold-dark">Moderation</p><h2 className="mt-1 text-2xl font-bold">Reviews</h2><p className="mt-1 text-sm text-stone-500">Approve, hide, inspect, or delete product feedback.</p></div>{error && <p role="alert" className="m-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}{loading ? <p className="p-8 text-sm text-stone-500">Loading reviews...</p> : reviews.length === 0 ? <div className="m-7 rounded-xl border border-dashed p-10 text-center"><Star className="mx-auto text-stone-300" /><p className="mt-3 text-sm text-stone-500">No reviews found.</p></div> : <div className="divide-y">{reviews.map((review) => <article key={review.id} className="flex items-center gap-4 px-5 py-4 sm:px-7"><div className="min-w-0 flex-1"><p className="font-semibold">{review.customer_name} · {review.rating}/5</p><p className="mt-1 text-sm text-stone-500">{review.products?.name} — {review.title || review.body}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${review.is_approved ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{review.is_approved ? "Approved" : "Pending"}</span><button onClick={() => setSelected(review)} className="rounded-xl border px-3 py-2 text-xs font-semibold hover:border-gold">Manage</button></article>)}</div>}{selected && <CatalogDialog title={selected.title || "Customer review"} subtitle={`${selected.customer_name} on ${selected.products?.name}`} onClose={() => setSelected(null)}><div className="p-5 sm:p-7"><p className="rounded-2xl bg-stone-50 p-5 text-sm leading-7">{selected.body}</p><div className="mt-6 flex flex-wrap justify-between gap-3"><button onClick={remove} className="flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600"><Trash2 size={15} /> Delete</button><button onClick={() => update(!selected.is_approved)} className="rounded-xl bg-ink px-5 py-2.5 text-sm font-semibold text-white">{selected.is_approved ? "Hide Review" : "Approve Review"}</button></div></div></CatalogDialog>}</section>;
+  async function updateStatus(status) {
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/admin/reviews/${selected.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Unable to update review.");
+      notifyStorefrontUpdate("reviews");
+      setSelected({ ...selected, status, is_approved: status === "approved" });
+      await load();
+    } catch (updateError) {
+      setError(updateError.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function remove() {
+    if (!window.confirm("Delete this review?")) return;
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/admin/reviews/${selected.id}`, { method: "DELETE" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Unable to delete review.");
+      notifyStorefrontUpdate("reviews");
+      setSelected(null);
+      await load();
+    } catch (removeError) {
+      setError(removeError.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+  const getStatus = (review) => review.status || (review.is_approved ? "approved" : "pending");
+  const pendingCount = reviews.filter((review) => getStatus(review) === "pending").length;
+  const approvedCount = reviews.filter((review) => getStatus(review) === "approved").length;
+  return (
+    <section className="overflow-hidden rounded-2xl border bg-white shadow-sm">
+      <div className="border-b px-5 py-5 sm:px-7">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gold-dark">Moderation</p>
+        <h2 className="mt-1 text-2xl font-bold">Reviews</h2>
+        <p className="mt-1 text-sm text-stone-500">Inspect customer feedback and approve or reject what appears publicly.</p>
+        <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+          <span className="rounded-full bg-amber-50 px-3 py-1.5 text-amber-700">{pendingCount} pending</span>
+          <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-700">{approvedCount} approved</span>
+        </div>
+      </div>
+      {error && <p role="alert" className="m-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+      {loading ? <p className="p-8 text-sm text-stone-500">Loading reviews...</p> : reviews.length === 0 ? <div className="m-7 rounded-xl border border-dashed p-10 text-center"><Star className="mx-auto text-stone-300" /><p className="mt-3 text-sm text-stone-500">No reviews found.</p></div> : (
+        <div className="divide-y">
+          {reviews.map((review) => {
+            const status = getStatus(review);
+            return <article key={review.id} className="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:px-7">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-3"><p className="font-semibold">{review.customer_name}</p><ReviewStars rating={review.rating} size={14} /></div>
+                <p className="mt-1 text-sm text-stone-500">{review.products?.name} — {review.title || review.body}</p>
+              </div>
+              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${status === "approved" ? "bg-emerald-50 text-emerald-700" : status === "rejected" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"}`}>{status}</span>
+              <button onClick={() => setSelected(review)} className="rounded-xl border px-3 py-2 text-xs font-semibold hover:border-gold">Inspect</button>
+            </article>;
+          })}
+        </div>
+      )}
+      {selected && (() => {
+        const status = getStatus(selected);
+        return <CatalogDialog title={selected.title || "Customer review"} subtitle={`${selected.customer_name} on ${selected.products?.name}`} onClose={() => setSelected(null)}>
+          <div className="p-5 sm:p-7">
+            <div className="flex flex-wrap items-center justify-between gap-3"><ReviewStars rating={selected.rating} size={20} /><span className={`rounded-full px-3 py-1 text-xs font-semibold ${status === "approved" ? "bg-emerald-50 text-emerald-700" : status === "rejected" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"}`}>{status}</span></div>
+            <p className="mt-4 rounded-2xl bg-stone-50 p-5 text-sm leading-7">{selected.body}</p>
+            <p className="mt-3 text-xs text-stone-400">Submitted {new Date(selected.created_at).toLocaleString("en-IN")}</p>
+            <div className="mt-6 flex flex-wrap justify-between gap-3"><button disabled={saving} onClick={remove} className="flex items-center gap-2 rounded-xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600 disabled:opacity-50"><Trash2 size={15} /> Delete</button><div className="flex flex-wrap gap-2"><button disabled={saving || status === "rejected"} onClick={() => updateStatus("rejected")} className="rounded-xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600 disabled:opacity-50">Reject</button><button disabled={saving || status === "approved"} onClick={() => updateStatus("approved")} className="rounded-xl bg-ink px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">Approve</button></div></div>
+          </div>
+        </CatalogDialog>;
+      })()}
+    </section>
+  );
 }
 
 export function AdminDeliverySettings() {

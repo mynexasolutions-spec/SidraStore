@@ -95,11 +95,11 @@ try {
   await request("/api/admin/delivery-settings", { method: "PUT", body: JSON.stringify(originalSettings) });
 
   const { data: existingProduct } = await supabase.from("products").select("id").neq("id", created.productId).limit(1).single();
-  const { data: review, error: reviewError } = await supabase.from("reviews").insert({ product_id: existingProduct.id, customer_name: "Audit Customer", rating: 5, title: "Audit review", body: "Temporary safe audit review.", is_approved: false }).select("id").single();
+  const { data: review, error: reviewError } = await supabase.from("reviews").insert({ product_id: existingProduct.id, customer_name: "Audit Customer", rating: 5, title: "Audit review", body: "Temporary safe audit review.", status: "pending", is_approved: false }).select("id").single();
   if (reviewError) throw reviewError;
   created.reviewId = review.id;
-  result = await request(`/api/admin/reviews/${review.id}`, { method: "PATCH", body: JSON.stringify({ is_approved: true }) });
-  record("Review moderation update", result.response.ok && result.body.review?.is_approved, `status ${result.response.status}`);
+  result = await request(`/api/admin/reviews/${review.id}`, { method: "PATCH", body: JSON.stringify({ status: "approved" }) });
+  record("Review moderation update", result.response.ok && result.body.review?.status === "approved", `status ${result.response.status}`);
   result = await request(`/api/admin/reviews/${review.id}`, { method: "DELETE" });
   record("Review delete", result.response.ok, `status ${result.response.status}`);
   created.reviewId = null;

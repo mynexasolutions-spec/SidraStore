@@ -1,94 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, Heart, ShoppingCart, Star, StarHalf, Tag } from "lucide-react";
+import { Eye, Heart, ShoppingCart, Tag } from "lucide-react";
 import SmartImage from "./SmartImage";
 import Reveal from "./Reveal";
 import Particles from "./Particles";
 import { getProductPath } from "@/lib/productCatalog";
 import { useWishlist } from "./WishlistProvider";
-
-// All cap images from /public/products/Ismalic Caps/ folder
-const capImages = [
-  // Original collection (WA series)
-  { src: "/products/Ismalic Caps/IMG-20230108-WA0009.jpg.jpeg", name: "Classic White Kufi", desc: "Traditional cotton kufi cap", tone: "from-stone-100 to-stone-300", category: "Classic" },
-  { src: "/products/Ismalic Caps/IMG-20230108-WA0010.jpg.jpeg", name: "Embroidered Taqiyah", desc: "Gold thread embroidery detail", tone: "from-amber-100 to-amber-300", category: "Embroidered" },
-  { src: "/products/Ismalic Caps/IMG-20230108-WA0016.jpg.jpeg", name: "Premium Barkati Cap", desc: "Handcrafted premium fabric", tone: "from-slate-200 to-slate-400", category: "Barkati" },
-  { src: "/products/Ismalic Caps/IMG-20230108-WA0020.jpg.jpeg", name: "Designer Owaisi Cap", desc: "Modern fit with classic style", tone: "from-sky-100 to-sky-300", category: "Owaisi" },
-  { src: "/products/Ismalic Caps/IMG-20230108-WA0022.jpg.jpeg", name: "Omani Style Cap", desc: "Traditional Omani design", tone: "from-stone-700 to-stone-900", category: "Omani" },
-  { src: "/products/Ismalic Caps/IMG-20230108-WA0026.jpg.jpeg", name: "Jarkali Premium Cap", desc: "Distinctive peaked design", tone: "from-stone-200 to-stone-400", category: "Jarkali" },
-  { src: "/products/Ismalic Caps/IMG-20230108-WA0029.jpg.jpeg", name: "Imama Shareef Style", desc: "Elegant turban-style cap", tone: "from-stone-100 to-stone-300", category: "Imama" },
-  { src: "/products/Ismalic Caps/IMG-20230108-WA0031.jpg.jpeg", name: "Designer Collection 1", desc: "Exclusive designer pattern", tone: "from-stone-700 to-stone-900", category: "Designer" },
-  { src: "/products/Ismalic Caps/IMG-20230108-WA0035.jpg.jpeg", name: "Designer Collection 2", desc: "Premium embroidered finish", tone: "from-amber-700 to-amber-950", category: "Designer" },
-  { src: "/products/Ismalic Caps/IMG_20230331_213440.jpg.jpeg", name: "Designer Collection 3", desc: "Luxury fabric blend", tone: "from-stone-800 to-stone-950", category: "Designer" },
-  { src: "/products/Ismalic Caps/IMG_20230331_214004.jpg.jpeg", name: "Designer Collection 4", desc: "Artisanal craftsmanship", tone: "from-slate-700 to-slate-900", category: "Designer" },
-  { src: "/products/Ismalic Caps/IMG_20230331_214015.jpg.jpeg", name: "Designer Collection 5", desc: "Limited edition design", tone: "from-amber-800 to-stone-900", category: "Designer" },
-
-  // 2025 collection
-  { src: "/products/Ismalic Caps/IMG_20250131_233946_122 (1) (1).png", name: "Premium Velvet Cap", desc: "Luxury velvet finish", tone: "from-purple-800 to-purple-950", category: "Premium" },
-  { src: "/products/Ismalic Caps/IMG_20250131_233946_122 (1) (2).png", name: "Royal Blue Taqiyah", desc: "Rich blue premium fabric", tone: "from-blue-700 to-blue-950", category: "Premium" },
-  { src: "/products/Ismalic Caps/IMG_20250131_233946_122 (1) (3).png", name: "Gold Trimmed Kufi", desc: "Gold accent detailing", tone: "from-amber-600 to-amber-900", category: "Premium" },
-  { src: "/products/Ismalic Caps/IMG_20250131_233946_122 (30) (1).png", name: "Designer Series A", desc: "Exclusive designer series", tone: "from-stone-700 to-stone-900", category: "Designer" },
-  { src: "/products/Ismalic Caps/IMG_20250131_233946_122 (30).png", name: "Designer Series B", desc: "Exclusive designer series", tone: "from-slate-700 to-slate-900", category: "Designer" },
-  { src: "/products/Ismalic Caps/IMG_20250131_233946_122 (31).png", name: "Designer Series C", desc: "Exclusive designer series", tone: "from-gray-700 to-gray-900", category: "Designer" },
-
-  // December 2025 collection
-  { src: "/products/Ismalic Caps/IMG_20251225_214159348 (1).png", name: "Winter Collection 1", desc: "Warm winter fabric", tone: "from-red-700 to-red-950", category: "Seasonal" },
-  { src: "/products/Ismalic Caps/IMG_20251225_214159348 (2).png", name: "Winter Collection 2", desc: "Premium winter blend", tone: "from-rose-700 to-rose-950", category: "Seasonal" },
-  { src: "/products/Ismalic Caps/IMG_20251225_214159348.png", name: "Winter Collection 3", desc: "Cozy winter design", tone: "from-amber-700 to-amber-950", category: "Seasonal" },
-  { src: "/products/Ismalic Caps/IMG_20251225_214628925.png", name: "Festive Special", desc: "Eid festive design", tone: "from-emerald-700 to-emerald-950", category: "Festive" },
-
-  // Photoroom collection (2026)
-  { src: "/products/Ismalic Caps/Photoroom-20260115_203906723 (5).png", name: "Modern Minimalist", desc: "Clean modern design", tone: "from-stone-600 to-stone-800", category: "Modern" },
-  { src: "/products/Ismalic Caps/Photoroom-20260115_203906723 (6).png", name: "Contemporary Classic", desc: "Timeless contemporary", tone: "from-slate-600 to-slate-800", category: "Modern" },
-  { src: "/products/Ismalic Caps/Photoroom-20260115_210713131.png", name: "Artisan Series 1", desc: "Handcrafted artisan", tone: "from-amber-600 to-amber-800", category: "Artisan" },
-  { src: "/products/Ismalic Caps/Photoroom-20260115_210713131 (1).png", name: "Artisan Series 2", desc: "Handcrafted artisan", tone: "from-amber-700 to-amber-900", category: "Artisan" },
-  { src: "/products/Ismalic Caps/Photoroom-20260115_210713131 (2).png", name: "Artisan Series 3", desc: "Handcrafted artisan", tone: "from-amber-800 to-amber-950", category: "Artisan" },
-  { src: "/products/Ismalic Caps/Photoroom-20260115_210713131 (3).png", name: "Artisan Series 4", desc: "Handcrafted artisan", tone: "from-orange-600 to-orange-800", category: "Artisan" },
-  { src: "/products/Ismalic Caps/Photoroom-20260115_210713131 (4).png", name: "Artisan Series 5", desc: "Handcrafted artisan", tone: "from-yellow-600 to-yellow-800", category: "Artisan" },
-  { src: "/products/Ismalic Caps/Photoroom-20260115_210713131 (5).png", name: "Artisan Series 6", desc: "Handcrafted artisan", tone: "from-amber-500 to-amber-700", category: "Artisan" },
-  { src: "/products/Ismalic Caps/Photoroom-20260115_210713131 (7).png", name: "Artisan Series 7", desc: "Handcrafted artisan", tone: "from-amber-600 to-amber-800", category: "Artisan" },
-  { src: "/products/Ismalic Caps/Photoroom-20260115_210713131 (8).png", name: "Artisan Series 8", desc: "Handcrafted artisan", tone: "from-amber-700 to-amber-900", category: "Artisan" },
-  { src: "/products/Ismalic Caps/Photoroom-20260115_210713131 (9).png", name: "Artisan Series 9", desc: "Handcrafted artisan", tone: "from-amber-800 to-amber-950", category: "Artisan" },
-  { src: "/products/Ismalic Caps/Photoroom-20260115_210713131 (10).png", name: "Artisan Series 10", desc: "Handcrafted artisan", tone: "from-orange-700 to-orange-900", category: "Artisan" },
-  { src: "/products/Ismalic Caps/Photoroom-20260115_210713131 (11).png", name: "Artisan Series 11", desc: "Handcrafted artisan", tone: "from-amber-600 to-amber-800", category: "Artisan" },
-  { src: "/products/Ismalic Caps/Photoroom-20260115_210713131 (12).png", name: "Artisan Series 12", desc: "Handcrafted artisan", tone: "from-amber-700 to-amber-900", category: "Artisan" },
-
-  // SIDRA BG collection
-  { src: "/products/Ismalic Caps/SIDRA BG (2) (7).png", name: "Sidra Signature 1", desc: "Signature Sidra design", tone: "from-gold-600 to-gold-800", category: "Signature" },
-  { src: "/products/Ismalic Caps/SIDRA BG (2) (14).png", name: "Sidra Signature 2", desc: "Signature Sidra design", tone: "from-gold-700 to-gold-900", category: "Signature" },
-  { src: "/products/Ismalic Caps/SIDRA BG (2) (15).png", name: "Sidra Signature 3", desc: "Signature Sidra design", tone: "from-amber-700 to-amber-900", category: "Signature" },
-  { src: "/products/Ismalic Caps/SIDRA BG (2) (16).png", name: "Sidra Signature 4", desc: "Signature Sidra design", tone: "from-yellow-700 to-yellow-900", category: "Signature" },
-  { src: "/products/Ismalic Caps/SIDRA BG (2) (17).png", name: "Sidra Signature 5", desc: "Signature Sidra design", tone: "from-amber-600 to-amber-800", category: "Signature" },
-  { src: "/products/Ismalic Caps/SIDRA BG (2) (20).png", name: "Sidra Signature 6", desc: "Signature Sidra design", tone: "from-gold-600 to-gold-800", category: "Signature" },
-];
-
-const prices = [299, 349, 399, 449, 499, 549, 599, 649, 699, 749, 799, 849];
-const ratings = [4.5, 4.6, 4.7, 4.8, 4.5, 4.6, 4.7, 4.8, 4.9, 4.5, 4.6, 4.7];
-const reviews = [120, 89, 156, 78, 203, 134, 97, 65, 43, 112, 87, 56, 234, 189, 167, 98, 76, 145, 210, 178];
-
-const capProducts = capImages.map((img, i) => ({
-  ...img,
-  price: prices[i % prices.length],
-  rating: ratings[i % ratings.length],
-  reviews: reviews[i % reviews.length],
-  badge: i === 0 ? "Best Seller" : i === 3 ? "New Arrival" : i === 7 ? "Limited" : i === 15 ? "Exclusive" : i === 25 ? "Featured" : null,
-}));
-
-function Stars({ value }) {
-  return (
-    <div className="flex items-center text-gold">
-      {[1, 2, 3, 4, 5].map((i) => {
-        if (value >= i) return <Star key={i} size={13} fill="currentColor" />;
-        if (value >= i - 0.5) return <StarHalf key={i} size={13} fill="currentColor" />;
-        return <Star key={i} size={13} className="text-stone-300" />;
-      })}
-    </div>
-  );
-}
+import { useStorefrontCatalog } from "./useStorefrontData";
+import ProductRating from "./ReviewSummary";
 
 export default function DesignerCaps() {
   const { isWishlisted, toggleWishlist } = useWishlist();
+  const { products: catalogProducts, error: catalogError, isLoading } = useStorefrontCatalog([]);
+  const capProducts = catalogProducts.filter((product) => product.categorySlug === "islamic-caps" || product.category === "Islamic Caps");
   const [added, setAdded] = useState(() => new Set());
   const [showAll, setShowAll] = useState(false);
 
@@ -105,6 +30,8 @@ export default function DesignerCaps() {
 
   const initialCount = 10;
   const displayProducts = showAll ? capProducts : capProducts.slice(0, initialCount);
+
+  if (isLoading) return <section className="bg-cream py-20 text-center text-sm text-stone-500">Loading cap collection...</section>;
 
   return (
     <section className="relative isolate overflow-hidden bg-cream py-20 lg:py-24">
@@ -147,6 +74,8 @@ export default function DesignerCaps() {
           </div>
         </Reveal>
 
+        {catalogError && <p role="alert" className="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">Catalog synchronization failed: {catalogError}</p>}
+
         {/* Grid: 5 columns on desktop, 2 on tablet, 1 on mobile */}
         <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
           {displayProducts.map((p, i) => {
@@ -172,7 +101,7 @@ export default function DesignerCaps() {
 
                     {/* Category badge */}
                     <span className="absolute left-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-bold shadow-lg bg-white/90 text-stone-700 backdrop-blur-sm border border-gold/30">
-                      {p.category}
+                      {p.subCategory || p.category}
                     </span>
 
                     {/* Rank badge */}
@@ -229,11 +158,7 @@ export default function DesignerCaps() {
                       )}
                     </div>
                     <p className="mt-0.5 text-[13px] text-stone-500 line-clamp-1">{p.desc}</p>
-                    <div className="mt-2 flex items-center gap-1.5">
-                      <Stars value={p.rating} />
-                      <span className="text-xs font-semibold text-ink">{p.rating}</span>
-                      <span className="text-xs text-stone-400">({p.reviews})</span>
-                    </div>
+                    <ProductRating rating={p.rating} reviews={p.reviews} size={13} className="mt-2 text-xs" />
                     <p className="mt-2.5 text-2xl font-bold text-ink">
                       <span className="mr-0.5 text-lg font-semibold text-gold-dark">₹</span>
                       {p.price}

@@ -95,10 +95,10 @@ function buildSeedSql(products, imageUrls) {
     const imageUrl = imageUrls[product.src];
     const variantsJson = sqlJsonb(product.variants || []);
     lines.push(
-      "insert into public.products (category_id, subcategory_id, name, slug, short_description, description, price, stock_quantity, image_url, badge, rating, review_count, is_featured, is_active, variants) " +
-      `select categories.id, subcategories.id, ${sqlText(product.name)}, ${sqlText(slug)}, ${sqlText(product.desc)}, ${sqlText(product.desc)}, ${Number(product.price)}, 100, ${sqlText(imageUrl)}, ${sqlText(product.badge)}, ${Number(product.rating)}, ${Number(product.reviews)}, ${featuredProductNames.has(product.name) ? "true" : "false"}, true, ${variantsJson} ` +
+      "insert into public.products (category_id, subcategory_id, name, slug, short_description, description, price, stock_quantity, image_url, badge, is_featured, is_active, variants) " +
+      `select categories.id, subcategories.id, ${sqlText(product.name)}, ${sqlText(slug)}, ${sqlText(product.desc)}, ${sqlText(product.desc)}, ${Number(product.price)}, 100, ${sqlText(imageUrl)}, ${sqlText(product.badge)}, ${featuredProductNames.has(product.name) ? "true" : "false"}, true, ${variantsJson} ` +
       `from public.categories join public.subcategories on subcategories.category_id = categories.id and subcategories.slug = ${sqlText(subcategorySlug)} where categories.slug = ${sqlText(categorySlug)} ` +
-      "on conflict (slug) do update set category_id = excluded.category_id, subcategory_id = excluded.subcategory_id, name = excluded.name, short_description = excluded.short_description, description = excluded.description, price = excluded.price, image_url = excluded.image_url, badge = excluded.badge, rating = excluded.rating, review_count = excluded.review_count, is_featured = excluded.is_featured, is_active = true, variants = excluded.variants;",
+      "on conflict (slug) do update set category_id = excluded.category_id, subcategory_id = excluded.subcategory_id, name = excluded.name, short_description = excluded.short_description, description = excluded.description, price = excluded.price, image_url = excluded.image_url, badge = excluded.badge, is_featured = excluded.is_featured, is_active = true, variants = excluded.variants;",
     );
   }
   return `${lines.join("\n")}\n`;

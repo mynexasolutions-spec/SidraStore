@@ -1,26 +1,27 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Eye, Heart, ShoppingCart, Star, StarHalf, Tag, Filter, ChevronDown } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Eye, Heart, ShoppingCart, Tag, Filter, ChevronDown } from "lucide-react";
 import SmartImage from "./SmartImage";
 import Reveal from "./Reveal";
 import Particles from "./Particles";
-import { allProducts, getProductPath } from "@/lib/productCatalog";
+import { getProductPath } from "@/lib/productCatalog";
 import { useCart } from "./CartProvider";
 import { useWishlist } from "./WishlistProvider";
 import { useStorefrontCatalog } from "./useStorefrontData";
+import ProductRating from "./ReviewSummary";
 
 function categorySlug(value) {
   return String(value || "").toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
-function getInitialFilterState(initialCategory, queryString = "") {
+function getInitialFilterState(initialCategory, queryString = "", catalogCategories = []) {
   const searchParams = new URLSearchParams(queryString);
   const categorySlugs = searchParams.getAll("category");
   const categoryNames = categorySlugs
-    .map((slug) => allProducts.find((product) => categorySlug(product.category) === slug)?.category)
+    .map((slug) => catalogCategories.find((category) => categorySlug(category.slug || category.name) === slug)?.name)
     .filter(Boolean);
-  const fallbackCategory = allProducts.find((product) => categorySlug(product.category) === initialCategory)?.category;
+  const fallbackCategory = catalogCategories.find((category) => categorySlug(category.slug || category.name) === initialCategory)?.name;
   const maximumPriceValue = searchParams.get("maxPrice");
   const maximumPrice = maximumPriceValue === null ? null : Number(maximumPriceValue);
   const requestedSort = searchParams.get("sort");
@@ -34,6 +35,53 @@ function getInitialFilterState(initialCategory, queryString = "") {
     productsPerPage: [12, 24, 36].includes(requestedProductsPerPage) ? requestedProductsPerPage : 12,
     currentPage: Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1,
   };
+}
+
+function SkeletonBlock({ className = "" }) {
+  return <div className={`animate-pulse rounded-xl bg-stone-200/80 ${className}`} aria-hidden="true" />;
+}
+
+function ShopSkeleton() {
+  return (
+    <section className="relative isolate overflow-clip bg-cream py-20 lg:py-24" aria-busy="true" aria-label="Loading products">
+      <div className="pointer-events-none absolute -left-40 top-20 h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(232,189,109,0.18),transparent_65%)]" />
+      <div className="pointer-events-none absolute -right-40 bottom-10 h-[460px] w-[460px] rounded-full bg-[radial-gradient(circle,rgba(201,154,75,0.14),transparent_65%)]" />
+
+      <div className="container-site relative">
+        <div>
+          <SkeletonBlock className="h-3 w-36" />
+          <SkeletonBlock className="mt-4 h-12 w-64 max-w-full" />
+          <SkeletonBlock className="mt-4 hidden h-5 w-[420px] max-w-full sm:block" />
+        </div>
+
+        <div className="mt-8 flex items-center justify-between gap-4 border-y border-gold/20 py-4">
+          <SkeletonBlock className="h-11 w-28 lg:hidden" />
+          <SkeletonBlock className="hidden h-4 w-48 lg:block" />
+          <div className="ml-auto flex gap-2">
+            <SkeletonBlock className="hidden h-11 w-24 sm:block" />
+            <SkeletonBlock className="h-11 w-36" />
+          </div>
+        </div>
+
+        <div className="mt-8 grid items-start gap-7 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
+          <SkeletonBlock className="hidden h-[520px] rounded-3xl lg:block" />
+          <div className="grid grid-cols-2 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }, (_, index) => (
+              <div key={index} className="overflow-hidden rounded-3xl bg-white ring-1 ring-stone-200">
+                <SkeletonBlock className="aspect-square rounded-none" />
+                <div className="space-y-3 p-3">
+                  <SkeletonBlock className="h-5 w-3/4" />
+                  <SkeletonBlock className="h-3 w-full" />
+                  <SkeletonBlock className="h-4 w-1/2" />
+                  <SkeletonBlock className="h-10 w-full rounded-xl" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function FilterPanel({ products, categories, minimumCatalogPrice, maximumCatalogPrice, selectedCategories, maximumPrice, onCategoryToggle, onClearCategories, onMaximumPriceChange, onReset }) {
@@ -118,31 +166,17 @@ function FilterPanel({ products, categories, minimumCatalogPrice, maximumCatalog
   );
 }
 
-function Stars({ value }) {
-  return (
-    <div className="flex items-center text-gold">
-      {[1, 2, 3, 4, 5].map((i) => {
-        if (value >= i) return <Star key={i} size={13} fill="currentColor" />;
-        if (value >= i - 0.5) return <StarHalf key={i} size={13} fill="currentColor" />;
-        return <Star key={i} size={13} className="text-stone-300" />;
-      })}
-    </div>
-  );
-}
-
-export default function AllProducts({ initialCategory }) {
+function LoadedAllProducts({ initialCategory, products, catalogCategories, catalogError, refreshCatalog }) {
   const { addItem } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
-  const { products, error: catalogError } = useStorefrontCatalog(allProducts);
-  const initialFilterState = getInitialFilterState(initialCategory);
   const categories = useMemo(() => {
     const categoryNames = new Map();
-    products.forEach((product) => {
-      const category = String(product.category || "Uncategorized").trim();
-      categoryNames.set(category.toLowerCase(), category);
+    catalogCategories.forEach((categoryRecord) => {
+      const category = String(categoryRecord.name || "").trim();
+      if (category) categoryNames.set(category.toLowerCase(), category);
     });
     return [...categoryNames.values()];
-  }, [products]);
+  }, [catalogCategories]);
   const { minimumCatalogPrice, maximumCatalogPrice } = useMemo(() => {
     const catalogPrices = products.map((product) => product.price);
     return {
@@ -151,28 +185,34 @@ export default function AllProducts({ initialCategory }) {
     };
   }, [products]);
   const [added, setAdded] = useState(() => new Set());
-  const [selectedCategories, setSelectedCategories] = useState(() => new Set(initialFilterState.selectedCategories));
-  const [maximumPriceOverride, setMaximumPriceOverride] = useState(initialFilterState.maximumPriceOverride);
+  const [selectedCategories, setSelectedCategories] = useState(() => new Set());
+  const [maximumPriceOverride, setMaximumPriceOverride] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [sortBy, setSortBy] = useState(initialFilterState.sortBy);
-  const [productsPerPage, setProductsPerPage] = useState(initialFilterState.productsPerPage);
-  const [currentPage, setCurrentPage] = useState(initialFilterState.currentPage);
+  const [sortBy, setSortBy] = useState("featured");
+  const [productsPerPage, setProductsPerPage] = useState(12);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [filtersReady, setFiltersReady] = useState(false);
+  const skipPageReset = useRef(true);
   const maximumPrice = Math.min(maximumPriceOverride ?? maximumCatalogPrice, maximumCatalogPrice);
 
   useEffect(() => {
-    const restoredFilterState = getInitialFilterState(initialCategory, window.location.search);
+    const restoredFilterState = getInitialFilterState(initialCategory, window.location.search, catalogCategories);
     setSelectedCategories(new Set(restoredFilterState.selectedCategories));
     setMaximumPriceOverride(restoredFilterState.maximumPriceOverride);
     setSortBy(restoredFilterState.sortBy);
     setProductsPerPage(restoredFilterState.productsPerPage);
     setCurrentPage(restoredFilterState.currentPage);
-  }, [initialCategory]);
+    skipPageReset.current = true;
+    setFiltersReady(true);
+  }, [catalogCategories, initialCategory]);
 
   useEffect(() => {
-    if (!initialCategory) return;
-    const matchingCategory = categories.find((category) => categorySlug(category) === initialCategory);
-    if (matchingCategory) setSelectedCategories(new Set([matchingCategory]));
-  }, [categories, initialCategory]);
+    if (!filtersReady) return;
+    setSelectedCategories((currentCategories) => {
+      const validCategories = new Set([...currentCategories].filter((category) => categories.includes(category)));
+      return validCategories.size === currentCategories.size ? currentCategories : validCategories;
+    });
+  }, [categories, filtersReady]);
 
   const toggle = (setter, name, ms) =>
     setter((prev) => {
@@ -226,11 +266,16 @@ export default function AllProducts({ initialCategory }) {
   }, [activePage, pageCount]);
 
   useEffect(() => {
+    if (!filtersReady) return;
+    if (skipPageReset.current) {
+      skipPageReset.current = false;
+      return;
+    }
     setCurrentPage(1);
-  }, [maximumPriceOverride, productsPerPage, selectedCategories, sortBy]);
+  }, [filtersReady, maximumPriceOverride, productsPerPage, selectedCategories, sortBy]);
 
   useEffect(() => {
-    if (typeof window === "undefined" || !products.length) return;
+    if (typeof window === "undefined" || !filtersReady || !products.length) return;
 
     const searchParams = new URLSearchParams(window.location.search);
     searchParams.delete("category");
@@ -251,7 +296,9 @@ export default function AllProducts({ initialCategory }) {
     const query = searchParams.toString();
     const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
     window.history.replaceState(window.history.state, "", nextUrl);
-  }, [activePage, maximumCatalogPrice, maximumPrice, maximumPriceOverride, products.length, productsPerPage, selectedCategories, sortBy]);
+  }, [activePage, filtersReady, maximumCatalogPrice, maximumPrice, maximumPriceOverride, products.length, productsPerPage, selectedCategories, sortBy]);
+
+  if (!filtersReady) return <ShopSkeleton />;
 
   return (
     <section className="relative isolate overflow-clip bg-cream py-20 lg:py-24">
@@ -294,7 +341,14 @@ export default function AllProducts({ initialCategory }) {
           </div>
         </Reveal>
 
-        {catalogError && <p role="alert" className="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">Catalog synchronization failed: {catalogError}</p>}
+        {catalogError && (
+          <div role="alert" className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+            <span>Catalog synchronization failed: {catalogError}</span>
+            <button type="button" onClick={refreshCatalog} className="rounded-full border border-red-200 px-3 py-1.5 font-semibold transition hover:bg-red-100">
+              Retry
+            </button>
+          </div>
+        )}
 
         <div className="mt-8 flex items-center justify-between gap-4 border-y border-gold/20 py-4">
           <button
@@ -448,11 +502,7 @@ export default function AllProducts({ initialCategory }) {
                       </h3>
                     </div>
                     <p className="mt-0.5 text-[11px] text-stone-500 line-clamp-1">{p.desc}</p>
-                    <div className="mt-1.5 flex items-center gap-1">
-                      <Stars value={p.rating} />
-                      <span className="text-[11px] font-semibold text-ink">{p.rating}</span>
-                      <span className="text-[11px] text-stone-400">({p.reviews})</span>
-                    </div>
+                    <ProductRating rating={p.rating} reviews={p.reviews} size={13} className="mt-1.5 text-[11px]" />
                     <p className="mt-2 text-xl font-bold text-ink">
                       <span className="mr-0.5 text-base font-semibold text-gold-dark">₹</span>
                       {p.price}
@@ -503,5 +553,21 @@ export default function AllProducts({ initialCategory }) {
         </div>
       </div>
     </section>
+  );
+}
+
+export default function AllProducts({ initialCategory }) {
+  const { products, categories: catalogCategories, error: catalogError, refresh, isLoading } = useStorefrontCatalog([]);
+
+  if (isLoading) return <ShopSkeleton />;
+
+  return (
+    <LoadedAllProducts
+      initialCategory={initialCategory}
+      products={products}
+      catalogCategories={catalogCategories}
+      catalogError={catalogError}
+      refreshCatalog={refresh}
+    />
   );
 }

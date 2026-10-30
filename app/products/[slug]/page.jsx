@@ -15,15 +15,23 @@ export const dynamic = "force-dynamic";
 
 const loadProduct = cache(async (slug) => {
   const fallbackProduct = findProductBySlug(slug);
+  const safeFallbackProduct = fallbackProduct ? { ...fallbackProduct, rating: 0, reviews: 0 } : null;
   try {
-    const { data, error } = await createAdminCatalogClient()
+    const supabase = createAdminCatalogClient();
+    const { data, error } = await supabase
       .from("products")
-      .select("id,name,slug,short_description,description,price,stock_quantity,image_url,gallery_urls,variants,badge,rating,review_count,categories(name,slug),subcategories(name,slug)")
+      .select("id,name,slug,short_description,description,price,stock_quantity,image_url,gallery_urls,variants,badge,categories(name,slug),subcategories(name,slug)")
       .eq("slug", slug)
       .eq("is_active", true)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    if (!data) return fallbackProduct ? { ...fallbackProduct, slug } : null;
+    if (!data) return safeFallbackProduct ? { ...safeFallbackProduct, slug } : null;
+    const { data: reviewSummary, error: reviewSummaryError } = await supabase
+      .from("product_review_summaries")
+      .select("average_rating,approved_review_count")
+      .eq("product_id", data.id)
+      .maybeSingle();
+    if (reviewSummaryError) throw new Error(reviewSummaryError.message);
     return applyProductCatalogDetails({
       id: data.id,
       slug: data.slug,
@@ -34,19 +42,19 @@ const loadProduct = cache(async (slug) => {
       description: data.description,
       price: Number(data.price),
       stockQuantity: Number(data.stock_quantity),
-      rating: Number(data.rating),
-      reviews: Number(data.review_count),
+      rating: Number(reviewSummary?.average_rating || 0),
+      reviews: Number(reviewSummary?.approved_review_count || 0),
       category: data.categories?.name || "Uncategorized",
       categorySlug: data.categories?.slug,
       subCategory: data.subcategories?.name || "General",
       badge: data.badge,
       variants: data.variants || [],
       tone: fallbackProduct?.tone || "from-stone-200 to-cream",
-    }, fallbackProduct);
+    }, safeFallbackProduct);
   } catch (error) {
-    if (!fallbackProduct) throw error;
+    if (!safeFallbackProduct) throw error;
     console.warn("Product database lookup failed; using the bundled catalog entry.", { slug, error: error.message });
-    return { ...fallbackProduct, slug };
+    return { ...safeFallbackProduct, slug };
   }
 });
 

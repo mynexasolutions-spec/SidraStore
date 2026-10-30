@@ -9,8 +9,6 @@ import {
   RotateCcw,
   ShieldCheck,
   ShoppingBag,
-  Star,
-  StarHalf,
   Truck,
   Zap,
 } from "lucide-react";
@@ -21,18 +19,7 @@ import { useCart } from "./CartProvider";
 import { useStorefrontCatalog } from "./useStorefrontData";
 import ProductGallery from "./ProductGallery";
 import ProductReviews from "./ProductReviews";
-
-function Stars({ value, size }) {
-  return (
-    <div className="flex items-center text-gold" aria-label={`${value} out of 5 stars`}>
-      {[1, 2, 3, 4, 5].map((index) => {
-        if (value >= index) return <Star key={index} size={size} fill="currentColor" />;
-        if (value >= index - 0.5) return <StarHalf key={index} size={size} fill="currentColor" />;
-        return <Star key={index} size={size} className="text-stone-300" />;
-      })}
-    </div>
-  );
-}
+import ProductRating from "./ReviewSummary";
 
 function getDescription(product) {
   if (product.description?.trim()) return product.description.trim();
@@ -120,11 +107,7 @@ export default function ProductDetails({ product: initialProduct, similarProduct
               </h1>
               <p className="mt-3 text-lg text-stone-500">{product.desc}</p>
 
-              <div className="mt-5 flex flex-wrap items-center gap-3">
-                <Stars value={product.rating} size={18} />
-                <span className="font-semibold">{product.rating}</span>
-                <span className="text-sm text-stone-500">({product.reviews} verified reviews)</span>
-              </div>
+              <ProductRating rating={product.rating} reviews={product.reviews} size={18} className="mt-5 text-sm" />
 
               <p className="mt-7 max-w-[620px] whitespace-pre-line text-base leading-8 text-stone-600">
                 {getDescription(product)}
@@ -263,10 +246,7 @@ export default function ProductDetails({ product: initialProduct, similarProduct
                         {similarProduct.name}
                       </a>
                     </h3>
-                    <div className="mt-2 flex items-center gap-2">
-                      <Stars value={similarProduct.rating} size={13} />
-                      <span className="text-xs text-stone-500">({similarProduct.reviews})</span>
-                    </div>
+                    <ProductRating rating={similarProduct.rating} reviews={similarProduct.reviews} size={13} className="mt-2 text-xs" />
                     <p className="mt-3 text-xl font-bold sm:text-2xl">
                       <span className="mr-0.5 text-lg text-gold-dark">₹</span>
                       {similarProduct.price}

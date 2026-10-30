@@ -9,8 +9,6 @@ import {
   Flame,
   Heart,
   ShoppingCart,
-  Star,
-  StarHalf,
 } from "lucide-react";
 import SmartImage from "./SmartImage";
 import Reveal from "./Reveal";
@@ -18,18 +16,7 @@ import { allProducts, getProductPath } from "@/lib/productCatalog";
 import { useCart } from "./CartProvider";
 import { useWishlist } from "./WishlistProvider";
 import { useStorefrontCatalog } from "./useStorefrontData";
-
-function Stars({ value }) {
-  return (
-    <div className="flex items-center text-gold">
-      {[1, 2, 3, 4, 5].map((i) => {
-        if (value >= i) return <Star key={i} size={13} fill="currentColor" />;
-        if (value >= i - 0.5) return <StarHalf key={i} size={13} fill="currentColor" />;
-        return <Star key={i} size={13} className="text-stone-300" />;
-      })}
-    </div>
-  );
-}
+import ProductRating from "./ReviewSummary";
 
 export default function Bestsellers() {
   const { addItem } = useCart();
@@ -224,11 +211,7 @@ export default function Bestsellers() {
                       <a href={getProductPath(p)} className="transition hover:text-gold-dark">{p.name}</a>
                     </h3>
                     <p className="mt-0.5 text-[13px] text-stone-500">{p.subCategory || p.desc}</p>
-                    <div className="mt-2 flex items-center gap-1.5">
-                      <Stars value={p.rating} />
-                      <span className="text-xs font-semibold text-ink">{p.rating}</span>
-                      <span className="text-xs text-stone-400">({p.reviews})</span>
-                    </div>
+                    <ProductRating rating={p.rating} reviews={p.reviews} size={13} className="mt-2 text-xs" />
                     <p className="mt-2.5 text-2xl font-bold text-ink">
                       <span className="mr-0.5 text-lg font-semibold text-gold-dark">₹</span>
                       {p.price}

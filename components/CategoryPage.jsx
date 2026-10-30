@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, Heart, ShoppingCart, Star, StarHalf, Tag, ChevronDown } from "lucide-react";
+import { Eye, Heart, ShoppingCart, Tag, ChevronDown } from "lucide-react";
 import SmartImage from "./SmartImage";
 import Reveal from "./Reveal";
 import Particles from "./Particles";
@@ -9,6 +9,7 @@ import { getProductPath } from "@/lib/productCatalog";
 import { useCart } from "./CartProvider";
 import { useWishlist } from "./WishlistProvider";
 import { useStorefrontCatalog } from "./useStorefrontData";
+import ProductRating from "./ReviewSummary";
 
 const categoryData = {
   "attar-fragrances": {
@@ -16,13 +17,13 @@ const categoryData = {
     subtitle: "Premium Attar Collection",
     description: "Discover our exquisite range of premium attars crafted from the finest ingredients.",
     products: [
-      { src: "/products/Attar & Fragrances/sidra-oudh.jpg", name: "Sidra Oudh", desc: "Premium Attar", price: 499, rating: 4.5, reviews: 210, tone: "from-emerald-900 to-stone-900", badge: "Best Seller", subCategory: "Oudh" },
-      { src: "/products/Attar & Fragrances/aseel.jpg", name: "Aseel", desc: "Premium Attar", price: 499, rating: 4.5, reviews: 176, tone: "from-amber-700 to-amber-950", badge: "Popular", subCategory: "Oudh" },
-      { src: "/products/Attar & Fragrances/white-oudh.jpg", name: "White Oudh", desc: "Premium Attar", price: 699, rating: 4.5, reviews: 134, tone: "from-stone-100 to-stone-300", subCategory: "Oudh" },
-      { src: "/products/Attar & Fragrances/cr7.jpg", name: "CR 7", desc: "Premium Attar", price: 499, rating: 4.5, reviews: 98, tone: "from-stone-700 to-stone-950", subCategory: "Oudh" },
-      { src: "/products/Attar & Fragrances/jannatul-ferdous.jpg", name: "Jannatul Ferdous", desc: "Premium Attar", price: 899, rating: 4.5, reviews: 167, tone: "from-teal-800 to-emerald-950", badge: "Premium", subCategory: "Floral" },
-      { src: "/products/Attar & Fragrances/rose-bulgari.jpg", name: "Rose Bulgari", desc: "Premium Attar", price: 499, rating: 4.5, reviews: 140, tone: "from-rose-600 to-red-900", subCategory: "Floral" },
-      { src: "/products/Attar & Fragrances/fasli-gulab.jpg", name: "Fasli Gulab", desc: "Premium Attar", price: 499, rating: 4.5, reviews: 102, tone: "from-orange-300 to-amber-700", subCategory: "Floral" },
+      { src: "/products/Attar & Fragrances/sidra-oudh.jpg", name: "Sidra Oudh", desc: "Premium Attar", price: 499, tone: "from-emerald-900 to-stone-900", badge: "Best Seller", subCategory: "Oudh" },
+      { src: "/products/Attar & Fragrances/aseel.jpg", name: "Aseel", desc: "Premium Attar", price: 499, tone: "from-amber-700 to-amber-950", badge: "Popular", subCategory: "Oudh" },
+      { src: "/products/Attar & Fragrances/white-oudh.jpg", name: "White Oudh", desc: "Premium Attar", price: 699, tone: "from-stone-100 to-stone-300", subCategory: "Oudh" },
+      { src: "/products/Attar & Fragrances/cr7.jpg", name: "CR 7", desc: "Premium Attar", price: 499, tone: "from-stone-700 to-stone-950", subCategory: "Oudh" },
+      { src: "/products/Attar & Fragrances/jannatul-ferdous.jpg", name: "Jannatul Ferdous", desc: "Premium Attar", price: 899, tone: "from-teal-800 to-emerald-950", badge: "Premium", subCategory: "Floral" },
+      { src: "/products/Attar & Fragrances/rose-bulgari.jpg", name: "Rose Bulgari", desc: "Premium Attar", price: 499, tone: "from-rose-600 to-red-900", subCategory: "Floral" },
+      { src: "/products/Attar & Fragrances/fasli-gulab.jpg", name: "Fasli Gulab", desc: "Premium Attar", price: 499, tone: "from-orange-300 to-amber-700", subCategory: "Floral" },
     ]
   },
   "islamic-caps": {
@@ -30,18 +31,18 @@ const categoryData = {
     subtitle: "Designer Collection",
     description: "Handcrafted Islamic caps blending tradition with contemporary elegance.",
     products: [
-      { src: "/products/Ismalic Caps/IMG-20230108-WA0009.jpg.jpeg", name: "Classic White Kufi", desc: "Traditional cotton kufi cap", price: 299, rating: 4.6, reviews: 120, tone: "from-stone-100 to-stone-300", badge: "Best Seller", subCategory: "Classic" },
-      { src: "/products/Ismalic Caps/IMG-20230108-WA0010.jpg.jpeg", name: "Embroidered Taqiyah", desc: "Gold thread embroidery detail", price: 349, rating: 4.7, reviews: 89, tone: "from-amber-100 to-amber-300", subCategory: "Embroidered" },
-      { src: "/products/Ismalic Caps/IMG-20230108-WA0016.jpg.jpeg", name: "Premium Barkati Cap", desc: "Handcrafted premium fabric", price: 399, rating: 4.6, reviews: 156, tone: "from-slate-200 to-slate-400", subCategory: "Barkati" },
-      { src: "/products/Ismalic Caps/IMG-20230108-WA0020.jpg.jpeg", name: "Designer Owaisi Cap", desc: "Modern fit with classic style", price: 449, rating: 4.8, reviews: 78, tone: "from-sky-100 to-sky-300", badge: "New Arrival", subCategory: "Owaisi" },
-      { src: "/products/Ismalic Caps/IMG-20230108-WA0022.jpg.jpeg", name: "Omani Style Cap", desc: "Traditional Omani design", price: 499, rating: 4.5, reviews: 203, tone: "from-stone-700 to-stone-900", subCategory: "Omani" },
-      { src: "/products/Ismalic Caps/IMG-20230108-WA0026.jpg.jpeg", name: "Jarkali Premium Cap", desc: "Distinctive peaked design", price: 399, rating: 4.6, reviews: 134, tone: "from-stone-200 to-stone-400", subCategory: "Jarkali" },
-      { src: "/products/Ismalic Caps/IMG-20230108-WA0029.jpg.jpeg", name: "Imama Shareef Style", desc: "Elegant turban-style cap", price: 449, rating: 4.7, reviews: 97, tone: "from-stone-100 to-stone-300", subCategory: "Imama" },
-      { src: "/products/Ismalic Caps/IMG-20230108-WA0031.jpg.jpeg", name: "Designer Collection 1", desc: "Exclusive designer pattern", price: 549, rating: 4.8, reviews: 65, tone: "from-stone-700 to-stone-900", badge: "Limited", subCategory: "Designer" },
-      { src: "/products/Ismalic Caps/IMG-20230108-WA0035.jpg.jpeg", name: "Designer Collection 2", desc: "Premium embroidered finish", price: 599, rating: 4.9, reviews: 43, tone: "from-amber-700 to-amber-950", badge: "Limited", subCategory: "Designer" },
-      { src: "/products/Ismalic Caps/IMG_20230331_213440.jpg.jpeg", name: "Designer Collection 3", desc: "Luxury fabric blend", price: 499, rating: 4.6, reviews: 112, tone: "from-stone-800 to-stone-950", subCategory: "Designer" },
-      { src: "/products/Ismalic Caps/IMG_20230331_214004.jpg.jpeg", name: "Designer Collection 4", desc: "Artisanal craftsmanship", price: 549, rating: 4.7, reviews: 87, tone: "from-slate-700 to-slate-900", subCategory: "Designer" },
-      { src: "/products/Ismalic Caps/IMG_20230331_214015.jpg.jpeg", name: "Designer Collection 5", desc: "Limited edition design", price: 599, rating: 4.8, reviews: 56, tone: "from-amber-800 to-stone-900", subCategory: "Designer" },
+      { src: "/products/Ismalic Caps/IMG-20230108-WA0009.jpg.jpeg", name: "Classic White Kufi", desc: "Traditional cotton kufi cap", price: 299, tone: "from-stone-100 to-stone-300", badge: "Best Seller", subCategory: "Classic" },
+      { src: "/products/Ismalic Caps/IMG-20230108-WA0010.jpg.jpeg", name: "Embroidered Taqiyah", desc: "Gold thread embroidery detail", price: 349, tone: "from-amber-100 to-amber-300", subCategory: "Embroidered" },
+      { src: "/products/Ismalic Caps/IMG-20230108-WA0016.jpg.jpeg", name: "Premium Barkati Cap", desc: "Handcrafted premium fabric", price: 399, tone: "from-slate-200 to-slate-400", subCategory: "Barkati" },
+      { src: "/products/Ismalic Caps/IMG-20230108-WA0020.jpg.jpeg", name: "Designer Owaisi Cap", desc: "Modern fit with classic style", price: 449, tone: "from-sky-100 to-sky-300", badge: "New Arrival", subCategory: "Owaisi" },
+      { src: "/products/Ismalic Caps/IMG-20230108-WA0022.jpg.jpeg", name: "Omani Style Cap", desc: "Traditional Omani design", price: 499, tone: "from-stone-700 to-stone-900", subCategory: "Omani" },
+      { src: "/products/Ismalic Caps/IMG-20230108-WA0026.jpg.jpeg", name: "Jarkali Premium Cap", desc: "Distinctive peaked design", price: 399, tone: "from-stone-200 to-stone-400", subCategory: "Jarkali" },
+      { src: "/products/Ismalic Caps/IMG-20230108-WA0029.jpg.jpeg", name: "Imama Shareef Style", desc: "Elegant turban-style cap", price: 449, tone: "from-stone-100 to-stone-300", subCategory: "Imama" },
+      { src: "/products/Ismalic Caps/IMG-20230108-WA0031.jpg.jpeg", name: "Designer Collection 1", desc: "Exclusive designer pattern", price: 549, tone: "from-stone-700 to-stone-900", badge: "Limited", subCategory: "Designer" },
+      { src: "/products/Ismalic Caps/IMG-20230108-WA0035.jpg.jpeg", name: "Designer Collection 2", desc: "Premium embroidered finish", price: 599, tone: "from-amber-700 to-amber-950", badge: "Limited", subCategory: "Designer" },
+      { src: "/products/Ismalic Caps/IMG_20230331_213440.jpg.jpeg", name: "Designer Collection 3", desc: "Luxury fabric blend", price: 499, tone: "from-stone-800 to-stone-950", subCategory: "Designer" },
+      { src: "/products/Ismalic Caps/IMG_20230331_214004.jpg.jpeg", name: "Designer Collection 4", desc: "Artisanal craftsmanship", price: 549, tone: "from-slate-700 to-slate-900", subCategory: "Designer" },
+      { src: "/products/Ismalic Caps/IMG_20230331_214015.jpg.jpeg", name: "Designer Collection 5", desc: "Limited edition design", price: 599, tone: "from-amber-800 to-stone-900", subCategory: "Designer" },
     ]
   },
   "surma": {
@@ -49,7 +50,7 @@ const categoryData = {
     subtitle: "Traditional Kohl Collection",
     description: "Authentic surma and kohl for beautiful, healthy eyes.",
     products: [
-      { src: "/products/surma/surma.jpg", name: "Pure Surma Kohl", desc: "Traditional eye kohl", price: 199, rating: 4.8, reviews: 234, tone: "from-stone-800 to-stone-950", badge: "Best Seller", subCategory: "Traditional" },
+      { src: "/products/surma/surma.jpg", name: "Pure Surma Kohl", desc: "Traditional eye kohl", price: 199, tone: "from-stone-800 to-stone-950", badge: "Best Seller", subCategory: "Traditional" },
     ]
   },
   "prayer-essentials": {
@@ -57,8 +58,8 @@ const categoryData = {
     subtitle: "Sacred Prayer Collection",
     description: "Premium prayer mats and essentials for your spiritual journey.",
     products: [
-      { src: "/products/Prayer Essentials/ja-namaz.jpg", name: "Premium Ja Namaz", desc: "Soft prayer mat", price: 599, rating: 4.9, reviews: 167, tone: "from-blue-700 to-blue-950", badge: "Premium", subCategory: "Prayer Mat" },
-      { src: "/products/Prayer Essentials/ja-namaz.jpg", name: "Velvet Ja Namaz", desc: "Luxury velvet prayer mat", price: 899, rating: 4.8, reviews: 98, tone: "from-purple-700 to-purple-950", subCategory: "Prayer Mat" },
+      { src: "/products/Prayer Essentials/ja-namaz.jpg", name: "Premium Ja Namaz", desc: "Soft prayer mat", price: 599, tone: "from-blue-700 to-blue-950", badge: "Premium", subCategory: "Prayer Mat" },
+      { src: "/products/Prayer Essentials/ja-namaz.jpg", name: "Velvet Ja Namaz", desc: "Luxury velvet prayer mat", price: 899, tone: "from-purple-700 to-purple-950", subCategory: "Prayer Mat" },
     ]
   },
   "islamic-wear": {
@@ -66,7 +67,7 @@ const categoryData = {
     subtitle: "Traditional Wear Collection",
     description: "Elegant Islamic wear crafted with premium fabrics.",
     products: [
-      { src: "/products/Ismalic wear/ajrak-chadar.jpg", name: "Ajrak Chadar", desc: "Traditional block print", price: 1299, rating: 4.8, reviews: 145, tone: "from-red-800 to-red-950", badge: "Popular", subCategory: "Chadar" },
+      { src: "/products/Ismalic wear/ajrak-chadar.jpg", name: "Ajrak Chadar", desc: "Traditional block print", price: 1299, tone: "from-red-800 to-red-950", badge: "Popular", subCategory: "Chadar" },
     ]
   },
   "gifts-combos": {
@@ -74,23 +75,11 @@ const categoryData = {
     subtitle: "Curated Gift Sets",
     description: "Thoughtfully curated gift combinations for your loved ones.",
     products: [
-      { src: "/products/attar-fragrances/attar.jpg", name: "Attar Gift Set (3pc)", desc: "Sidra Oudh, Aseel, White Oudh", price: 1499, rating: 4.9, reviews: 98, tone: "from-amber-700 to-amber-950", badge: "Best Seller", subCategory: "Attar Set" },
-      { src: "/products/gifts-combos/attar.jpg", name: "Premium Gift Box", desc: "Attar + Cap + Surma combo", price: 1999, rating: 4.8, reviews: 76, tone: "from-stone-700 to-stone-900", badge: "New", subCategory: "Combo" },
+      { src: "/products/attar-fragrances/attar.jpg", name: "Attar Gift Set (3pc)", desc: "Sidra Oudh, Aseel, White Oudh", price: 1499, tone: "from-amber-700 to-amber-950", badge: "Best Seller", subCategory: "Attar Set" },
+      { src: "/products/gifts-combos/attar.jpg", name: "Premium Gift Box", desc: "Attar + Cap + Surma combo", price: 1999, tone: "from-stone-700 to-stone-900", badge: "New", subCategory: "Combo" },
     ]
   },
 };
-
-function Stars({ value }) {
-  return (
-    <div className="flex items-center text-gold">
-      {[1, 2, 3, 4, 5].map((i) => {
-        if (value >= i) return <Star key={i} size={13} fill="currentColor" />;
-        if (value >= i - 0.5) return <StarHalf key={i} size={13} fill="currentColor" />;
-        return <Star key={i} size={13} className="text-stone-300" />;
-      })}
-    </div>
-  );
-}
 
 function CategoryPage({ categoryKey, initialCount = 8 }) {
   const { addItem } = useCart();
@@ -269,11 +258,7 @@ function CategoryPage({ categoryKey, initialCount = 8 }) {
                       </h3>
                     </div>
                     <p className="mt-0.5 text-[11px] text-stone-500 line-clamp-1">{p.desc}</p>
-                    <div className="mt-1.5 flex items-center gap-1">
-                      <Stars value={p.rating} />
-                      <span className="text-[11px] font-semibold text-ink">{p.rating}</span>
-                      <span className="text-[11px] text-stone-400">({p.reviews})</span>
-                    </div>
+                    <ProductRating rating={p.rating} reviews={p.reviews} size={13} className="mt-1.5 text-[11px]" />
                     <p className="mt-2 text-xl font-bold text-ink">
                       <span className="mr-0.5 text-base font-semibold text-gold-dark">₹</span>
                       {p.price}

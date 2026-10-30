@@ -15,6 +15,10 @@ This directory keeps database and authorization SQL separate from application co
 11. `migrations/011_storefront_sync_and_checkout_integrity.sql`
 12. `migrations/012_add_product_variants.sql`
 13. `migrations/013_product_media_reviews_and_cod.sql`
+14. `migrations/014_limit_featured_products.sql`
+15. `migrations/015_update_premium_attar_catalog.sql`
+16. `migrations/016_remove_legacy_attar_products.sql`
+17. `migrations/017_review_moderation_and_summaries.sql`
 
 Run `npm run upload:products` once to upload the product images in `public/products` to ImageKit. The script reads credentials from `.env`, writes the returned public URLs to `data/imagekit-product-urls.json`, and generates `migrations/007_seed_product_catalog.sql`. Then run migration 007 in the Supabase SQL editor.
 

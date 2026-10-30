@@ -12,9 +12,20 @@ export async function GET(_request, { params }) {
   try {
     const product = await findProduct(params.slug);
     if (!product) return NextResponse.json({ error: "Product not found." }, { status: 404 });
-    const { data, error } = await createAdminCatalogClient().from("reviews").select("id,customer_name,rating,title,body,created_at").eq("product_id", product.id).eq("is_approved", true).order("created_at", { ascending: false });
+    const supabase = createAdminCatalogClient();
+    const [{ data, error }, { data: summary, error: summaryError }] = await Promise.all([
+      supabase.from("reviews").select("id,customer_name,rating,title,body,created_at").eq("product_id", product.id).eq("status", "approved").order("created_at", { ascending: false }),
+      supabase.from("product_review_summaries").select("average_rating,approved_review_count").eq("product_id", product.id).maybeSingle(),
+    ]);
     if (error) throw new Error(error.message);
-    return NextResponse.json({ reviews: data }, { headers: { "Cache-Control": "no-store, max-age=0" } });
+    if (summaryError) throw new Error(summaryError.message);
+    return NextResponse.json({
+      reviews: data || [],
+      summary: {
+        rating: Number(summary?.average_rating || 0),
+        reviewCount: Number(summary?.approved_review_count || 0),
+      },
+    }, { headers: { "Cache-Control": "no-store, max-age=0" } });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -38,7 +49,7 @@ export async function POST(request, { params }) {
     const { data: customer } = await supabase.from("customers").select("full_name").eq("auth_user_id", user.id).maybeSingle();
     const customerName = customer?.full_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "Sidra customer";
     const { data: existing } = await supabase.from("reviews").select("id").eq("product_id", product.id).eq("auth_user_id", user.id).maybeSingle();
-    const reviewPayload = { product_id: product.id, auth_user_id: user.id, customer_name: customerName, rating, title, body: reviewBody, is_approved: false };
+    const reviewPayload = { product_id: product.id, auth_user_id: user.id, customer_name: customerName, rating, title, body: reviewBody, status: "pending", is_approved: false };
     const query = existing
       ? supabase.from("reviews").update(reviewPayload).eq("id", existing.id)
       : supabase.from("reviews").insert(reviewPayload);

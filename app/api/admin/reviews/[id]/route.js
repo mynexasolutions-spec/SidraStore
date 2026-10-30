@@ -5,7 +5,11 @@ export async function PATCH(request, { params }) {
   if (!isAuthorizedAdminRequest(request)) return NextResponse.json({ error: "Administrator authentication is required." }, { status: 401 });
   const body = await request.json();
   const payload = {};
-  if (Object.hasOwn(body, "is_approved")) payload.is_approved = body.is_approved === true;
+  if (Object.hasOwn(body, "status")) {
+    payload.status = String(body.status || "").trim().toLowerCase();
+    if (!["pending", "approved", "rejected"].includes(payload.status)) return NextResponse.json({ error: "Review status must be pending, approved, or rejected." }, { status: 400 });
+  }
+  if (Object.hasOwn(body, "is_approved")) payload.status = body.is_approved === true ? "approved" : "rejected";
   if (Object.hasOwn(body, "rating")) {
     payload.rating = Number(body.rating);
     if (!Number.isInteger(payload.rating) || payload.rating < 1 || payload.rating > 5) return NextResponse.json({ error: "Rating must be between 1 and 5." }, { status: 400 });

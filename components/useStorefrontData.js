@@ -10,6 +10,10 @@ function getProductKey(product) {
   return String(product.slug || product.name || "").trim().toLowerCase();
 }
 
+function withoutReviewSummary(product) {
+  return { ...product, rating: 0, reviews: 0 };
+}
+
 export function mapStorefrontProduct(product, fallbackProduct) {
   return applyProductCatalogDetails({
     id: product.id,
@@ -21,8 +25,8 @@ export function mapStorefrontProduct(product, fallbackProduct) {
     description: product.description,
     price: Number(product.price),
     stockQuantity: Number(product.stock_quantity),
-    rating: Number(product.rating),
-    reviews: Number(product.review_count),
+    rating: Number(product.average_rating || 0),
+    reviews: Number(product.approved_review_count || 0),
     isFeatured: Boolean(product.is_featured),
     category: product.categories?.name || "Uncategorized",
     categorySlug: product.categories?.slug,
@@ -36,37 +40,58 @@ export function mapStorefrontProduct(product, fallbackProduct) {
 function useLiveEndpoint(url, initialValue) {
   const [data, setData] = useState(initialValue);
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const dataSignatureRef = useRef(JSON.stringify(initialValue));
+  const requestSequenceRef = useRef(0);
   const refresh = useCallback(async () => {
-    const response = await fetch(url, { cache: "no-store" });
-    const result = await response.json();
-    if (!response.ok) throw new Error(result.error || `Unable to load ${url}.`);
-    const nextSignature = JSON.stringify(result);
-    if (nextSignature !== dataSignatureRef.current) {
-      dataSignatureRef.current = nextSignature;
-      setData(result);
+    const requestSequence = requestSequenceRef.current + 1;
+    requestSequenceRef.current = requestSequence;
+    try {
+      const response = await fetch(url, { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || `Unable to load ${url}.`);
+      if (requestSequence !== requestSequenceRef.current) return false;
+      const nextSignature = JSON.stringify(result);
+      if (nextSignature !== dataSignatureRef.current) {
+        dataSignatureRef.current = nextSignature;
+        setData(result);
+      }
+      setError("");
+      return true;
+    } catch (requestError) {
+      if (requestSequence !== requestSequenceRef.current) return false;
+      throw requestError;
     }
-    setError("");
   }, [url]);
 
   useEffect(() => {
     let mounted = true;
-    const update = () => refresh().catch((requestError) => { if (mounted) setError(requestError.message); });
+    const update = async () => {
+      try {
+        const isCurrentRequest = await refresh();
+        if (mounted && isCurrentRequest) setIsLoading(false);
+      } catch (requestError) {
+        if (mounted) {
+          setError(requestError.message);
+          setIsLoading(false);
+        }
+      }
+    };
     update();
     const unsubscribe = subscribeToStorefrontUpdates(update);
     const interval = window.setInterval(update, 10000);
     return () => { mounted = false; unsubscribe(); window.clearInterval(interval); };
   }, [refresh]);
-  return { data, error, refresh };
+  return { data, error, refresh, isLoading };
 }
 
 export function useStorefrontCatalog(initialProducts) {
   const initialProductsRef = useRef(initialProducts);
-  const { data, error, refresh } = useLiveEndpoint("/api/storefront/catalog", { products: [], categories: [] });
+  const { data, error, refresh, isLoading } = useLiveEndpoint("/api/storefront/catalog", { products: [], categories: [] });
   const products = useMemo(
     () => {
       const fallbackProducts = initialProductsRef.current;
-      if (!data.products.length) return fallbackProducts;
+      if (!data.products.length) return fallbackProducts.map(withoutReviewSummary);
 
       const fallbackByKey = new Map(fallbackProducts.map((product) => [getProductKey(product), product]));
       const fallbackOrder = new Map(fallbackProducts.map((product, index) => [getProductKey(product), index]));
@@ -88,12 +113,12 @@ export function useStorefrontCatalog(initialProducts) {
     },
     [data.products],
   );
-  return { products, categories: data.categories, error, refresh };
+  return { products, categories: data.categories, error, refresh, isLoading };
 }
 
 export function useStorefrontCategories(initialCategories = []) {
-  const { data, error, refresh } = useLiveEndpoint("/api/storefront/catalog", { products: [], categories: initialCategories });
-  return { categories: data.categories, error, refresh };
+  const { data, error, refresh, isLoading } = useLiveEndpoint("/api/storefront/catalog", { products: [], categories: initialCategories });
+  return { categories: data.categories, error, refresh, isLoading };
 }
 
 export function useStorefrontContent(initialValue) {
