@@ -22,7 +22,9 @@ This directory keeps database and authorization SQL separate from application co
 
 Run `npm run upload:products` once to upload the product images in `public/products` to ImageKit. The script reads credentials from `.env`, writes the returned public URLs to `data/imagekit-product-urls.json`, and generates `migrations/007_seed_product_catalog.sql`. Then run migration 007 in the Supabase SQL editor.
 
-For customer signup confirmation, configure Supabase Auth URL settings with your production site URL and add `http://localhost:3000/**` while developing. The app uses Supabase email/password authentication and never sends the service-role key to the browser.
+For customer OTP authentication, run `queries/email-otp-setup.sql` once in the Supabase SQL Editor. Configure Supabase Auth URL settings with your production site URL and add `http://localhost:3000/**` while developing. The app uses Brevo to send OTP emails, while Supabase Auth stores users and sessions; the service-role key is used only on the server and is never sent to the browser.
+
+For Razorpay online payments, run `queries/razorpay-setup.sql` once in the Supabase SQL Editor. Keep `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` server-only. Configure Razorpay Webhooks to send `payment.captured` and `order.paid` events to `/api/payments/razorpay/webhook`.
 
 After creating an administrator in Supabase Auth, edit and run `queries/bootstrap_admin.sql` once with that account's email. The query deliberately fails while the placeholder remains unchanged.
 

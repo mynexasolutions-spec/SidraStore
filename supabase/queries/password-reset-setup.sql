@@ -2,10 +2,12 @@
 -- No public-table schema, trigger, or RLS policy should be added for this flow.
 --
 -- In Supabase Dashboard > Authentication > URL Configuration, add the deployed URL:
--- https://<your-domain>/auth/confirm?next=/reset-password
+-- https://<your-domain>/reset-password
+-- https://<your-domain>/auth/confirm
 --
 -- Local development URL:
--- http://localhost:3000/auth/confirm?next=/reset-password
+-- http://localhost:3000/reset-password
+-- http://localhost:3000/auth/confirm
 --
 -- This verification query is safe to run after the application flow is deployed.
 select count(*) as confirmed_customer_accounts

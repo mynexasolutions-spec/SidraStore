@@ -9,12 +9,44 @@ import { useStorefrontContent } from "./useStorefrontData";
 
 const fieldClass = "mt-2 h-12 w-full rounded-xl border border-stone-200 bg-white px-4 outline-none transition focus:border-gold focus:ring-2 focus:ring-gold/15";
 
+function loadRazorpayScript() {
+  if (window.Razorpay) return Promise.resolve();
+
+  return new Promise((resolve, reject) => {
+    const scriptUrl = "https://checkout.razorpay.com/v1/checkout.js";
+    const existingScript = document.querySelector(`script[src="${scriptUrl}"]`);
+    if (existingScript) {
+      existingScript.addEventListener("load", resolve, { once: true });
+      existingScript.addEventListener("error", () => reject(new Error("Razorpay Checkout could not be loaded.")), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = scriptUrl;
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error("Razorpay Checkout could not be loaded."));
+    document.body.appendChild(script);
+  });
+}
+
+async function getApiError(response, fallback) {
+  try {
+    const body = await response.json();
+    return body?.error || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export default function CustomerCheckout({ user, customer, address }) {
   const { items, subtotal, updateQuantity, removeItem, clearCart } = useCart();
   const { data: storefrontContent, error: settingsError } = useStorefrontContent();
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [orderNumber, setOrderNumber] = useState("");
+  const [orderPaymentMethod, setOrderPaymentMethod] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cod");
   const deliverySettings = storefrontContent.delivery_settings;
   const freeShippingThreshold = Number(deliverySettings?.free_shipping_threshold ?? 999);
   const standardShippingAmount = Number(deliverySettings?.standard_shipping_amount ?? 90);
@@ -84,6 +116,66 @@ export default function CustomerCheckout({ user, customer, address }) {
       return;
     }
 
+    if (paymentMethod === "razorpay") {
+      try {
+        await loadRazorpayScript();
+        const createOrderResponse = await fetch("/api/payments/razorpay/create-order", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ addressId: savedAddress.id }),
+        });
+        if (!createOrderResponse.ok) throw new Error(await getApiError(createOrderResponse, "We could not start the online payment."));
+        const paymentOrder = await createOrderResponse.json();
+        const razorpay = new window.Razorpay({
+          key: paymentOrder.keyId,
+          amount: paymentOrder.amount,
+          currency: paymentOrder.currency,
+          name: "Sidra Store",
+          description: "Sidra Store purchase",
+          order_id: paymentOrder.orderId,
+          prefill: {
+            name: values.full_name,
+            email: user.email,
+            contact: values.phone,
+          },
+          notes: { payment_attempt_id: paymentOrder.attemptId },
+          theme: { color: "#a87a32" },
+          modal: {
+            ondismiss: () => {
+              setMessage("Payment was cancelled. Your cart is still saved.");
+              setSubmitting(false);
+            },
+          },
+          handler: async (paymentResponse) => {
+            try {
+              const verifyResponse = await fetch("/api/payments/razorpay/verify", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ ...paymentResponse, attemptId: paymentOrder.attemptId }),
+              });
+              if (!verifyResponse.ok) throw new Error(await getApiError(verifyResponse, "Payment verification failed."));
+              const result = await verifyResponse.json();
+              clearCart();
+              setOrderPaymentMethod("razorpay");
+              setOrderNumber(result.orderNumber);
+            } catch (error) {
+              setMessage(error.message || "Payment was received but order confirmation is pending.");
+              setSubmitting(false);
+            }
+          },
+        });
+        razorpay.on("payment.failed", (failure) => {
+          setMessage(failure.error?.description || "Payment failed. Your cart is still saved.");
+          setSubmitting(false);
+        });
+        razorpay.open();
+      } catch (error) {
+        setMessage(error.message || "We could not start the online payment.");
+        setSubmitting(false);
+      }
+      return;
+    }
+
     const { data: createdOrderNumber, error: orderError } = await supabase.rpc("place_customer_order", { p_address_id: savedAddress.id });
     setSubmitting(false);
     if (orderError) {
@@ -92,6 +184,7 @@ export default function CustomerCheckout({ user, customer, address }) {
     }
 
     clearCart();
+    setOrderPaymentMethod("cod");
     setOrderNumber(createdOrderNumber);
   }
 
@@ -101,7 +194,7 @@ export default function CustomerCheckout({ user, customer, address }) {
         <div className="mx-auto max-w-xl rounded-[32px] border border-gold/20 bg-white p-10 text-center shadow-xl">
           <CheckCircle2 size={58} className="mx-auto text-emerald-600" />
           <h1 className="mt-5 font-serif text-4xl font-semibold">Order confirmed</h1>
-          <p className="mt-3 text-stone-600">Your order number is <strong>{orderNumber}</strong>. Payment will be collected on delivery.</p>
+          <p className="mt-3 text-stone-600">Your order number is <strong>{orderNumber}</strong>. {orderPaymentMethod === "razorpay" ? "Your online payment has been received securely." : "Payment will be collected on delivery."}</p>
           <div className="mt-7 flex flex-wrap justify-center gap-3"><a href="/account" className="rounded-full border border-gold/50 px-6 py-3 text-sm font-semibold hover:bg-gold/10">View Order History</a><a href="/shop" className="btn-gold inline-flex">Continue Shopping</a></div>
         </div>
       </main>
@@ -161,9 +254,20 @@ export default function CustomerCheckout({ user, customer, address }) {
               <div className="flex justify-between"><span>Shipping</span><span>{shipping === 0 ? "Free" : `₹${shipping}`}</span></div>
               <div className="flex justify-between border-t pt-3 text-lg font-bold"><span>Total</span><span>₹{subtotal + shipping}</span></div>
             </div>
+            <div className="mt-6 rounded-2xl border border-stone-200 bg-cream/50 p-4">
+              <p className="text-sm font-bold">Payment method</p>
+              <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-stone-200 bg-white p-3">
+                <input type="radio" name="payment_method" value="cod" checked={paymentMethod === "cod"} onChange={() => setPaymentMethod("cod")} className="mt-1 accent-gold-dark" />
+                <span><span className="block text-sm font-semibold">Cash on Delivery</span><span className="mt-1 block text-xs text-stone-500">Pay when your order arrives.</span></span>
+              </label>
+              <label className="mt-2 flex cursor-pointer items-start gap-3 rounded-xl border border-stone-200 bg-white p-3">
+                <input type="radio" name="payment_method" value="razorpay" checked={paymentMethod === "razorpay"} onChange={() => setPaymentMethod("razorpay")} className="mt-1 accent-gold-dark" />
+                <span><span className="block text-sm font-semibold">Pay Online with Razorpay</span><span className="mt-1 block text-xs text-stone-500">Cards, UPI, net banking and wallets.</span></span>
+              </label>
+            </div>
             {settingsError && <p role="alert" className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">Delivery settings synchronization failed: {settingsError}</p>}
             {message && <p role="alert" className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{message}</p>}
-            <button form="checkout-form" disabled={submitting || items.length === 0} className="btn-gold mt-6 w-full disabled:cursor-not-allowed disabled:opacity-50">{submitting ? "Placing Order..." : "Place COD Order"}</button>
+            <button form="checkout-form" disabled={submitting || items.length === 0} className="btn-gold mt-6 w-full disabled:cursor-not-allowed disabled:opacity-50">{submitting ? paymentMethod === "razorpay" ? "Opening Razorpay..." : "Placing Order..." : paymentMethod === "razorpay" ? "Pay Securely" : "Place COD Order"}</button>
           </section>
         </div>
       </div>
