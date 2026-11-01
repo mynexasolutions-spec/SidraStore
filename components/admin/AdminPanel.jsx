@@ -25,6 +25,7 @@ import {
 import Logo from "@/components/Logo";
 import SmartImage from "@/components/SmartImage";
 import AdminCategories from "@/components/admin/AdminCategories";
+import AdminCartNotifications from "@/components/admin/AdminCartNotifications";
 import AdminCustomers from "@/components/admin/AdminCustomers";
 import AdminOrders from "@/components/admin/AdminOrders";
 import AdminProducts from "@/components/admin/AdminProducts";
@@ -529,6 +530,7 @@ export default function AdminPanel({ initialSection }) {
             <div><p className="text-lg font-bold">{activeLabel}</p><p className="hidden text-xs text-stone-400 sm:block">Sidra Store administration</p></div>
           </div>
           <div className="flex items-center gap-3 sm:gap-5">
+            <AdminCartNotifications />
             <span className="hidden items-center gap-3 sm:flex"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-100"><UserRound size={17} /></span><span><span className="block text-sm font-medium">Admin</span><span className="block text-xs text-stone-400">Administrator</span></span></span>
             <button onClick={logout} className="flex items-center gap-2 text-sm text-stone-500 transition hover:text-red-600"><LogOut size={17} /><span className="hidden sm:inline">Logout</span></button>
           </div>

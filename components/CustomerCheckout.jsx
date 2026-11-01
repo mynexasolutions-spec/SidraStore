@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CheckCircle2, LogOut, Minus, Plus, ShoppingBag, Trash2 } from "lucide-react";
 import SmartImage from "./SmartImage";
 import { useCart } from "./CartProvider";
@@ -48,9 +48,22 @@ export default function CustomerCheckout({ user, customer, address }) {
   const [orderPaymentMethod, setOrderPaymentMethod] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cod");
   const deliverySettings = storefrontContent.delivery_settings;
-  const freeShippingThreshold = Number(deliverySettings?.free_shipping_threshold ?? 999);
-  const standardShippingAmount = Number(deliverySettings?.standard_shipping_amount ?? 90);
-  const shipping = subtotal >= freeShippingThreshold || subtotal === 0 ? 0 : standardShippingAmount;
+  const prepaidEnabled = deliverySettings?.prepaid_enabled !== false;
+  const codEnabled = deliverySettings?.cod_enabled !== false;
+  const prepaidShippingAmount = Number(deliverySettings?.prepaid_shipping_amount ?? deliverySettings?.standard_shipping_amount ?? 90);
+  const prepaidFreeShippingThreshold = Number(deliverySettings?.prepaid_free_shipping_threshold ?? deliverySettings?.free_shipping_threshold ?? 999);
+  const codShippingAmount = Number(deliverySettings?.cod_shipping_amount ?? deliverySettings?.standard_shipping_amount ?? 90);
+  const codFreeShippingThreshold = Number(deliverySettings?.cod_free_shipping_threshold ?? deliverySettings?.free_shipping_threshold ?? 999);
+
+  useEffect(() => {
+    if (paymentMethod === "cod" && !codEnabled) setPaymentMethod(prepaidEnabled ? "razorpay" : "");
+    if (paymentMethod === "razorpay" && !prepaidEnabled) setPaymentMethod(codEnabled ? "cod" : "");
+  }, [codEnabled, paymentMethod, prepaidEnabled]);
+
+  const isCod = paymentMethod === "cod";
+  const shippingAmount = isCod ? codShippingAmount : prepaidShippingAmount;
+  const freeShippingThreshold = isCod ? codFreeShippingThreshold : prepaidFreeShippingThreshold;
+  const shipping = subtotal === 0 || (freeShippingThreshold > 0 && subtotal >= freeShippingThreshold) ? 0 : shippingAmount;
 
   async function signOut() {
     const supabase = createClient();
@@ -64,55 +77,98 @@ export default function CustomerCheckout({ user, customer, address }) {
       setMessage("Your cart is empty.");
       return;
     }
+    if (!paymentMethod) {
+      setMessage("No delivery option is currently available.");
+      return;
+    }
+    if ((paymentMethod === "cod" && !codEnabled) || (paymentMethod === "razorpay" && !prepaidEnabled)) {
+      setMessage("This delivery option is no longer available. Please choose another option.");
+      return;
+    }
 
     setSubmitting(true);
     setMessage("");
     const form = new FormData(event.currentTarget);
     const values = Object.fromEntries(form.entries());
-    const supabase = createClient();
-
-    const { error: customerError } = await supabase.from("customers").upsert({
-      auth_user_id: user.id,
-      full_name: values.full_name,
-      email: user.email,
-      phone: values.phone,
-    }, { onConflict: "auth_user_id" });
-
-    if (customerError) {
-      setMessage(customerError.message);
-      setSubmitting(false);
-      return;
-    }
-
-    const addressPayload = {
-      auth_user_id: user.id,
-      label: "Default",
-      recipient_name: values.full_name,
-      phone: values.phone,
-      address_line_1: values.address_line_1,
-      address_line_2: values.address_line_2 || null,
-      city: values.city,
-      state: values.state,
-      postal_code: values.postal_code,
-      country: "India",
-      is_default: true,
-    };
-    const addressQuery = address?.id
-      ? supabase.from("delivery_addresses").update(addressPayload).eq("id", address.id).select("id").single()
-      : supabase.from("delivery_addresses").insert(addressPayload).select("id").single();
-    const { data: savedAddress, error: addressError } = await addressQuery;
-
-    if (addressError) {
-      setMessage(addressError.message);
-      setSubmitting(false);
-      return;
-    }
-
     const cartItems = items.map((item) => ({ slug: item.productSlug || item.slug, quantity: item.quantity, variant_size: item.variant?.size || null }));
-    const { error: cartError } = await supabase.rpc("save_customer_cart", { p_items: cartItems });
-    if (cartError) {
-      setMessage(cartError.message);
+    const guestCheckout = {
+      fullName: values.full_name,
+      email: values.email,
+      phone: values.phone,
+      address: {
+        address_line_1: values.address_line_1,
+        address_line_2: values.address_line_2 || null,
+        city: values.city,
+        state: values.state,
+        postal_code: values.postal_code,
+      },
+      items: cartItems,
+    };
+    let paymentRequestBody = { guestCheckout };
+    let savedAddressId = address?.id || null;
+
+    if (user) {
+      const supabase = createClient();
+      const { error: customerError } = await supabase.from("customers").upsert({
+        auth_user_id: user.id,
+        full_name: values.full_name,
+        email: user.email,
+        phone: values.phone,
+      }, { onConflict: "auth_user_id" });
+
+      if (customerError) {
+        setMessage(customerError.message);
+        setSubmitting(false);
+        return;
+      }
+
+      const addressPayload = {
+        auth_user_id: user.id,
+        label: "Default",
+        recipient_name: values.full_name,
+        phone: values.phone,
+        address_line_1: values.address_line_1,
+        address_line_2: values.address_line_2 || null,
+        city: values.city,
+        state: values.state,
+        postal_code: values.postal_code,
+        country: "India",
+        is_default: true,
+      };
+      const addressQuery = address?.id
+        ? supabase.from("delivery_addresses").update(addressPayload).eq("id", address.id).select("id").single()
+        : supabase.from("delivery_addresses").insert(addressPayload).select("id").single();
+      const { data: savedAddress, error: addressError } = await addressQuery;
+
+      if (addressError) {
+        setMessage(addressError.message);
+        setSubmitting(false);
+        return;
+      }
+      savedAddressId = savedAddress.id;
+
+      const { error: cartError } = await supabase.rpc("save_customer_cart", { p_items: cartItems });
+      if (cartError) {
+        setMessage(cartError.message);
+        setSubmitting(false);
+        return;
+      }
+      paymentRequestBody = { addressId: savedAddress.id };
+    } else if (paymentMethod === "cod") {
+      const guestOrderResponse = await fetch("/api/guest-checkout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ guestCheckout }),
+      });
+      const guestOrderResult = await guestOrderResponse.json().catch(() => ({}));
       setSubmitting(false);
+      if (!guestOrderResponse.ok) {
+        setMessage(guestOrderResult.error || "We could not place your order.");
+        return;
+      }
+      clearCart();
+      setOrderPaymentMethod("cod");
+      setOrderNumber(guestOrderResult.orderNumber);
       return;
     }
 
@@ -122,7 +178,7 @@ export default function CustomerCheckout({ user, customer, address }) {
         const createOrderResponse = await fetch("/api/payments/razorpay/create-order", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ addressId: savedAddress.id }),
+          body: JSON.stringify(paymentRequestBody),
         });
         if (!createOrderResponse.ok) throw new Error(await getApiError(createOrderResponse, "We could not start the online payment."));
         const paymentOrder = await createOrderResponse.json();
@@ -135,7 +191,7 @@ export default function CustomerCheckout({ user, customer, address }) {
           order_id: paymentOrder.orderId,
           prefill: {
             name: values.full_name,
-            email: user.email,
+            email: user?.email || values.email,
             contact: values.phone,
           },
           notes: { payment_attempt_id: paymentOrder.attemptId },
@@ -176,7 +232,8 @@ export default function CustomerCheckout({ user, customer, address }) {
       return;
     }
 
-    const { data: createdOrderNumber, error: orderError } = await supabase.rpc("place_customer_order", { p_address_id: savedAddress.id });
+    const supabase = createClient();
+    const { data: createdOrderNumber, error: orderError } = await supabase.rpc("place_customer_order", { p_address_id: savedAddressId });
     setSubmitting(false);
     if (orderError) {
       setMessage(orderError.message);
@@ -195,7 +252,7 @@ export default function CustomerCheckout({ user, customer, address }) {
           <CheckCircle2 size={58} className="mx-auto text-emerald-600" />
           <h1 className="mt-5 font-serif text-4xl font-semibold">Order confirmed</h1>
           <p className="mt-3 text-stone-600">Your order number is <strong>{orderNumber}</strong>. {orderPaymentMethod === "razorpay" ? "Your online payment has been received securely." : "Payment will be collected on delivery."}</p>
-          <div className="mt-7 flex flex-wrap justify-center gap-3"><a href="/account" className="rounded-full border border-gold/50 px-6 py-3 text-sm font-semibold hover:bg-gold/10">View Order History</a><a href="/shop" className="btn-gold inline-flex">Continue Shopping</a></div>
+          <div className="mt-7 flex flex-wrap justify-center gap-3">{user && <a href="/account" className="rounded-full border border-gold/50 px-6 py-3 text-sm font-semibold hover:bg-gold/10">View Order History</a>}<a href="/shop" className="btn-gold inline-flex">Continue Shopping</a></div>
         </div>
       </main>
     );
@@ -208,9 +265,9 @@ export default function CustomerCheckout({ user, customer, address }) {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-gold-dark">Secure Checkout</p>
             <h1 className="mt-2 font-serif text-4xl font-semibold sm:text-5xl">Delivery & Order</h1>
-            <p className="mt-2 text-sm text-stone-500">Signed in as {user.email}</p>
+            {user ? <p className="mt-2 text-sm text-stone-500">Signed in as {user.email}</p> : <p className="mt-2 text-sm text-stone-500">Checking out as a guest. <a href="/login?next=/checkout" className="font-semibold text-gold-dark hover:underline">Sign in instead</a></p>}
           </div>
-          <button type="button" onClick={signOut} className="flex items-center gap-2 rounded-full border border-stone-300 bg-white px-5 py-2.5 text-sm font-semibold"><LogOut size={16} /> Sign Out</button>
+          {user && <button type="button" onClick={signOut} className="flex items-center gap-2 rounded-full border border-stone-300 bg-white px-5 py-2.5 text-sm font-semibold"><LogOut size={16} /> Sign Out</button>}
         </div>
 
         <div className="mt-9 grid gap-7 lg:grid-cols-[1.1fr_0.9fr]">
@@ -219,7 +276,7 @@ export default function CustomerCheckout({ user, customer, address }) {
             <div className="mt-6 grid gap-5 sm:grid-cols-2">
               <label className="text-sm font-semibold">Full name<input name="full_name" required minLength={2} defaultValue={address?.recipient_name || customer?.full_name || ""} className={fieldClass} /></label>
               <label className="text-sm font-semibold">Phone number<input name="phone" type="tel" required minLength={7} maxLength={20} pattern="[0-9+() -]{7,20}" defaultValue={address?.phone || customer?.phone || ""} className={fieldClass} /></label>
-              <label className="text-sm font-semibold sm:col-span-2">Email address<input type="email" value={user.email} readOnly className={`${fieldClass} bg-stone-50 text-stone-500`} /></label>
+              <label className="text-sm font-semibold sm:col-span-2">Email address<input name="email" type="email" required defaultValue={user?.email || ""} readOnly={Boolean(user)} className={`${fieldClass} ${user ? "bg-stone-50 text-stone-500" : ""}`} /></label>
               <label className="text-sm font-semibold sm:col-span-2">Address line 1<input name="address_line_1" required minLength={5} defaultValue={address?.address_line_1 || ""} className={fieldClass} /></label>
               <label className="text-sm font-semibold sm:col-span-2">Address line 2 <span className="font-normal text-stone-400">(optional)</span><input name="address_line_2" defaultValue={address?.address_line_2 || ""} className={fieldClass} /></label>
               <label className="text-sm font-semibold">City<input name="city" required minLength={2} defaultValue={address?.city || ""} className={fieldClass} /></label>
@@ -251,23 +308,24 @@ export default function CustomerCheckout({ user, customer, address }) {
             </div>
             <div className="mt-5 space-y-2 text-sm">
               <div className="flex justify-between"><span>Subtotal</span><span>₹{subtotal}</span></div>
-              <div className="flex justify-between"><span>Shipping</span><span>{shipping === 0 ? "Free" : `₹${shipping}`}</span></div>
+              <div className="flex justify-between"><span>Shipping ({isCod ? "COD" : "Online"})</span><span>{shipping === 0 ? "Free" : `₹${shipping}`}</span></div>
               <div className="flex justify-between border-t pt-3 text-lg font-bold"><span>Total</span><span>₹{subtotal + shipping}</span></div>
             </div>
             <div className="mt-6 rounded-2xl border border-stone-200 bg-cream/50 p-4">
               <p className="text-sm font-bold">Payment method</p>
-              <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-stone-200 bg-white p-3">
+              {codEnabled && <label className="mt-3 flex cursor-pointer items-start gap-3 rounded-xl border border-stone-200 bg-white p-3">
                 <input type="radio" name="payment_method" value="cod" checked={paymentMethod === "cod"} onChange={() => setPaymentMethod("cod")} className="mt-1 accent-gold-dark" />
                 <span><span className="block text-sm font-semibold">Cash on Delivery</span><span className="mt-1 block text-xs text-stone-500">Pay when your order arrives.</span></span>
-              </label>
-              <label className="mt-2 flex cursor-pointer items-start gap-3 rounded-xl border border-stone-200 bg-white p-3">
+              </label>}
+              {prepaidEnabled && <label className={`${codEnabled ? "mt-2" : "mt-3"} flex cursor-pointer items-start gap-3 rounded-xl border border-stone-200 bg-white p-3`}>
                 <input type="radio" name="payment_method" value="razorpay" checked={paymentMethod === "razorpay"} onChange={() => setPaymentMethod("razorpay")} className="mt-1 accent-gold-dark" />
-                <span><span className="block text-sm font-semibold">Pay Online with Razorpay</span><span className="mt-1 block text-xs text-stone-500">Cards, UPI, net banking and wallets.</span></span>
-              </label>
+                <span><span className="block text-sm font-semibold">Pay Online</span><span className="mt-1 block text-xs text-stone-500">Cards, UPI, net banking and wallets.</span></span>
+              </label>}
+              {!codEnabled && !prepaidEnabled && <p className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">Checkout is temporarily unavailable because no delivery option is enabled.</p>}
             </div>
             {settingsError && <p role="alert" className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">Delivery settings synchronization failed: {settingsError}</p>}
             {message && <p role="alert" className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{message}</p>}
-            <button form="checkout-form" disabled={submitting || items.length === 0} className="btn-gold mt-6 w-full disabled:cursor-not-allowed disabled:opacity-50">{submitting ? paymentMethod === "razorpay" ? "Opening Razorpay..." : "Placing Order..." : paymentMethod === "razorpay" ? "Pay Securely" : "Place COD Order"}</button>
+            <button form="checkout-form" disabled={submitting || items.length === 0 || !paymentMethod} className="btn-gold mt-6 w-full disabled:cursor-not-allowed disabled:opacity-50">{submitting ? paymentMethod === "razorpay" ? "Opening Razorpay..." : "Placing Order..." : paymentMethod === "cod" ? "Place COD Order" : paymentMethod === "razorpay" ? "Place Order" : "Checkout unavailable"}</button>
           </section>
         </div>
       </div>

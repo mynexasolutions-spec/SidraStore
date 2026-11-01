@@ -19,12 +19,18 @@ This directory keeps database and authorization SQL separate from application co
 15. `migrations/015_update_premium_attar_catalog.sql`
 16. `migrations/016_remove_legacy_attar_products.sql`
 17. `migrations/017_review_moderation_and_summaries.sql`
+18. `migrations/018_guest_checkout.sql`
+19. `migrations/019_cart_activity_notifications.sql`
 
 Run `npm run upload:products` once to upload the product images in `public/products` to ImageKit. The script reads credentials from `.env`, writes the returned public URLs to `data/imagekit-product-urls.json`, and generates `migrations/007_seed_product_catalog.sql`. Then run migration 007 in the Supabase SQL editor.
 
 For customer OTP authentication, run `queries/email-otp-setup.sql` once in the Supabase SQL Editor. Configure Supabase Auth URL settings with your production site URL and add `http://localhost:3000/**` while developing. The app uses Brevo to send OTP emails, while Supabase Auth stores users and sessions; the service-role key is used only on the server and is never sent to the browser.
 
 For Razorpay online payments, run `queries/razorpay-setup.sql` once in the Supabase SQL Editor. Keep `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` server-only. Configure Razorpay Webhooks to send `payment.captured` and `order.paid` events to `/api/payments/razorpay/webhook`.
+
+Migration 018 enables guest COD and Razorpay checkout. Guest orders reuse an existing Supabase Auth customer only when the matching email is confirmed; otherwise they reuse or create an unlinked guest customer record.
+
+Migration 019 records idempotent cart-add activity for authenticated customers. The Admin Panel reads these records through its protected admin API; the Supabase Realtime publication is enabled for the notification table so server-side subscribers can receive inserts without exposing customer details to anonymous storefront clients.
 
 After creating an administrator in Supabase Auth, edit and run `queries/bootstrap_admin.sql` once with that account's email. The query deliberately fails while the placeholder remains unchanged.
 

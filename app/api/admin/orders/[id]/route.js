@@ -2,18 +2,16 @@ import { NextResponse } from "next/server";
 import { createAdminCatalogClient, isAuthorizedAdminRequest } from "@/lib/adminCatalog";
 
 const orderStatuses = new Set(["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"]);
-const paymentStatuses = new Set(["pending", "paid", "failed", "refunded"]);
 
 export async function PATCH(request, { params }) {
   if (!isAuthorizedAdminRequest(request)) return NextResponse.json({ error: "Administrator authentication is required." }, { status: 401 });
   const body = await request.json();
   if (!orderStatuses.has(body.status)) return NextResponse.json({ error: "Invalid order status." }, { status: 400 });
-  if (!paymentStatuses.has(body.payment_status)) return NextResponse.json({ error: "Invalid payment status." }, { status: 400 });
 
   const supabase = createAdminCatalogClient();
   const { data, error } = await supabase
     .from("orders")
-    .update({ status: body.status, payment_status: body.payment_status })
+    .update({ status: body.status })
     .eq("id", params.id)
     .select("id,status,payment_status,updated_at")
     .single();

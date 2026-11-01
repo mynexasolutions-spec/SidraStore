@@ -15,9 +15,12 @@ export default function CartPage() {
   const [updating, setUpdating] = useState(null);
 
   const deliverySettings = storefrontContent?.delivery_settings;
-  const freeShippingThreshold = Number(deliverySettings?.free_shipping_threshold ?? 999);
-  const standardShippingAmount = Number(deliverySettings?.standard_shipping_amount ?? 90);
-  const shipping = subtotal >= freeShippingThreshold || subtotal === 0 ? 0 : standardShippingAmount;
+  const codEnabled = deliverySettings?.cod_enabled !== false;
+  const prepaidEnabled = deliverySettings?.prepaid_enabled !== false;
+  const previewPaymentMethod = codEnabled ? "cod" : prepaidEnabled ? "razorpay" : "";
+  const freeShippingThreshold = Number(previewPaymentMethod === "cod" ? deliverySettings?.cod_free_shipping_threshold ?? deliverySettings?.free_shipping_threshold ?? 999 : deliverySettings?.prepaid_free_shipping_threshold ?? deliverySettings?.free_shipping_threshold ?? 999);
+  const shippingAmount = Number(previewPaymentMethod === "cod" ? deliverySettings?.cod_shipping_amount ?? deliverySettings?.standard_shipping_amount ?? 90 : deliverySettings?.prepaid_shipping_amount ?? deliverySettings?.standard_shipping_amount ?? 90);
+  const shipping = !previewPaymentMethod || subtotal === 0 || (freeShippingThreshold > 0 && subtotal >= freeShippingThreshold) ? 0 : shippingAmount;
   const total = subtotal + shipping;
 
   const handleQuantityChange = (slug, newQuantity) => {
@@ -138,7 +141,7 @@ export default function CartPage() {
                     <span className="font-medium text-ink">₹{subtotal}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-stone-600">Shipping</span>
+                    <span className="text-stone-600">Shipping{previewPaymentMethod ? ` (${previewPaymentMethod === "cod" ? "COD" : "Online"})` : ""}</span>
                     <span className="font-medium text-ink">
                       {shipping === 0 ? (
                         <span className="text-emerald-600">Free</span>

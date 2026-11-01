@@ -19,17 +19,18 @@ export async function POST(request) {
     const supabase = createServerClient();
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError) throw userError;
-    if (!user) return NextResponse.json({ error: "Your session expired. Please sign in and try again." }, { status: 401 });
 
     const admin = createAdminClient();
     const { data: attempt, error: attemptError } = await admin
       .from("payment_attempts")
-      .select("id,auth_user_id,address_id,razorpay_order_id,razorpay_payment_id,amount,currency,status,order_number")
+      .select("id,auth_user_id,address_id,razorpay_order_id,razorpay_payment_id,amount,currency,status,order_number,guest_checkout")
       .eq("id", attemptId)
-      .eq("auth_user_id", user.id)
       .maybeSingle();
     if (attemptError) throw attemptError;
     if (!attempt) return NextResponse.json({ error: "The payment attempt was not found." }, { status: 404 });
+    const isGuestAttempt = !attempt.auth_user_id && attempt.guest_checkout;
+    if (!isGuestAttempt && !user) return NextResponse.json({ error: "Your session expired. Please sign in and try again." }, { status: 401 });
+    if (!isGuestAttempt && attempt.auth_user_id !== user.id) return NextResponse.json({ error: "The payment attempt was not found." }, { status: 404 });
     if (attempt.status === "consumed") return NextResponse.json({ ok: true, orderNumber: attempt.order_number });
     if (attempt.razorpay_order_id !== orderId) return NextResponse.json({ error: "The payment order does not match." }, { status: 400 });
 
@@ -56,7 +57,7 @@ export async function POST(request) {
       return NextResponse.json({ error: "This payment attempt cannot be completed." }, { status: 409 });
     }
 
-    const { data: orderNumber, error: finalizeError } = await admin.rpc("finalize_razorpay_payment", {
+    const { data: orderNumber, error: finalizeError } = await admin.rpc(isGuestAttempt ? "finalize_guest_razorpay_payment" : "finalize_razorpay_payment", {
       p_payment_attempt_id: attempt.id,
     });
     if (finalizeError) throw finalizeError;

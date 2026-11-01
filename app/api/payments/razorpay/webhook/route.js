@@ -25,7 +25,7 @@ export async function POST(request) {
     const admin = createAdminClient();
     const { data: attempt, error: attemptError } = await admin
       .from("payment_attempts")
-      .select("id,amount,currency,status,razorpay_order_id,razorpay_payment_id")
+      .select("id,amount,currency,status,razorpay_order_id,razorpay_payment_id,auth_user_id,guest_checkout")
       .eq("razorpay_order_id", payment.order_id)
       .maybeSingle();
     if (attemptError) throw attemptError;
@@ -45,7 +45,7 @@ export async function POST(request) {
       .eq("status", "created");
     if (updateError) throw updateError;
 
-    const { error: finalizeError } = await admin.rpc("finalize_razorpay_payment", {
+    const { error: finalizeError } = await admin.rpc(attempt.guest_checkout && !attempt.auth_user_id ? "finalize_guest_razorpay_payment" : "finalize_razorpay_payment", {
       p_payment_attempt_id: attempt.id,
     });
     if (finalizeError) throw finalizeError;

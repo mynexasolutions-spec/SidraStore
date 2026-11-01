@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { allProducts, createProductSlug } from "@/lib/productCatalog";
+import { createClient } from "@/lib/supabase/client";
 import { useStorefrontCatalog } from "./useStorefrontData";
 
 const STORAGE_KEY = "sidra_store_cart";
@@ -24,6 +25,26 @@ function normalizeCartItem(product, quantity) {
 
 function persistCart(items) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+}
+
+async function recordAuthenticatedCartActivity(item, quantity) {
+  const supabase = createClient();
+  const { data, error: userError } = await supabase.auth.getUser();
+  if (userError) {
+    console.error("Unable to verify the customer before recording cart activity.", userError);
+    return;
+  }
+  if (!data.user) return;
+
+  const { error } = await supabase.rpc("record_customer_cart_activity", {
+    p_product_slug: item.productSlug,
+    p_quantity: Math.min(25, Math.max(1, Math.floor(Number(quantity) || 1))),
+    p_variant_size: item.variant?.size || null,
+    p_event_id: window.crypto.randomUUID(),
+  });
+  if (error) {
+    console.error("Unable to record authenticated cart activity.", error);
+  }
 }
 
 export function CartProvider({ children }) {
@@ -95,6 +116,10 @@ export function CartProvider({ children }) {
     itemsRef.current = nextItems;
     persistCart(nextItems);
     setItems(nextItems);
+
+    void recordAuthenticatedCartActivity(nextItem, nextItem.quantity).catch((error) => {
+      console.error("Unable to record authenticated cart activity.", error);
+    });
   }, []);
 
   const updateQuantity = useCallback((slug, quantity) => {

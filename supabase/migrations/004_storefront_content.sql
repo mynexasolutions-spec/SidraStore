@@ -25,6 +25,12 @@ create table if not exists public.delivery_settings (
   id uuid primary key default gen_random_uuid(),
   free_shipping_threshold numeric(12, 2) not null default 999,
   standard_shipping_amount numeric(12, 2) not null default 0,
+  prepaid_enabled boolean not null default true,
+  prepaid_shipping_amount numeric(12, 2) not null default 0,
+  prepaid_free_shipping_threshold numeric(12, 2) not null default 999,
+  cod_enabled boolean not null default true,
+  cod_shipping_amount numeric(12, 2) not null default 100,
+  cod_free_shipping_threshold numeric(12, 2) not null default 999,
   currency_code text not null default 'INR',
   delivery_message text not null default 'Fast & Secure Delivery',
   updated_at timestamptz not null default now()

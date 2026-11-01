@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Eye, Image as ImageIcon, MessageCircleQuestion, Megaphone, Plus, Save, Star, Trash2, Truck, Upload } from "lucide-react";
+import { Banknote, CreditCard, Eye, Image as ImageIcon, MessageCircleQuestion, Megaphone, Plus, Save, Star, Trash2, Upload } from "lucide-react";
 import SmartImage from "@/components/SmartImage";
 import CatalogDialog from "./CatalogDialog";
 import { notifyStorefrontUpdate } from "@/lib/storefrontSync";
@@ -228,13 +228,154 @@ export function AdminReviews() {
   );
 }
 
+const defaultDeliverySettings = {
+  prepaid_enabled: true,
+  prepaid_shipping_amount: 0,
+  prepaid_free_shipping_threshold: 999,
+  cod_enabled: true,
+  cod_shipping_amount: 100,
+  cod_free_shipping_threshold: 999,
+  currency_code: "INR",
+  delivery_message: "Fast & Secure Delivery",
+};
+
+function normalizeDeliverySettings(settings) {
+  return {
+    ...defaultDeliverySettings,
+    ...settings,
+    prepaid_enabled: settings?.prepaid_enabled !== false,
+    cod_enabled: settings?.cod_enabled !== false,
+    prepaid_shipping_amount: settings?.prepaid_shipping_amount ?? settings?.standard_shipping_amount ?? defaultDeliverySettings.prepaid_shipping_amount,
+    prepaid_free_shipping_threshold: settings?.prepaid_free_shipping_threshold ?? settings?.free_shipping_threshold ?? defaultDeliverySettings.prepaid_free_shipping_threshold,
+    cod_shipping_amount: settings?.cod_shipping_amount ?? settings?.standard_shipping_amount ?? defaultDeliverySettings.cod_shipping_amount,
+    cod_free_shipping_threshold: settings?.cod_free_shipping_threshold ?? settings?.free_shipping_threshold ?? defaultDeliverySettings.cod_free_shipping_threshold,
+  };
+}
+
+function DeliveryOptionCard({ icon: Icon, title, description, enabled, toggle, onChange, chargeName, chargeValue, thresholdName, thresholdValue, optionLabel }) {
+  return (
+    <div className="grid gap-4 py-4 first:pt-0 last:pb-0 lg:grid-cols-[minmax(220px,0.75fr)_minmax(0,1.25fr)] lg:items-center">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${enabled ? "bg-blue-50 text-blue-600" : "bg-stone-100 text-stone-400"}`}><Icon size={17} /></span>
+          <div><h3 className="text-base font-bold text-ink">{title}</h3><p className="mt-1 text-xs text-stone-500">{description}</p></div>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          aria-label={`${optionLabel} delivery ${enabled ? "enabled" : "disabled"}`}
+          onClick={toggle}
+          className={`relative h-6 w-11 shrink-0 rounded-full transition ${enabled ? "bg-ink" : "bg-stone-300"}`}
+        >
+          <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition ${enabled ? "left-6" : "left-1"}`} />
+        </button>
+      </div>
+      <div>
+        <div className="grid gap-3 sm:grid-cols-2">
+        <label className="text-sm font-semibold text-stone-700">Shipping charge (₹)<input name={chargeName} type="number" min="0" step="0.01" required value={chargeValue} onChange={onChange} className={inputClass} /></label>
+        <label className="text-sm font-semibold text-stone-700">Free shipping threshold (₹)<input name={thresholdName} type="number" min="0" step="0.01" required value={thresholdValue} onChange={onChange} className={inputClass} /></label>
+        </div>
+        <p className="mt-2 text-xs text-stone-500">Threshold 0 disables free shipping. {enabled ? "Available at checkout." : "Hidden at checkout."}</p>
+      </div>
+    </div>
+  );
+}
+
 export function AdminDeliverySettings() {
   const [settings, setSettings] = useState(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  async function load() { const response = await fetch("/api/admin/delivery-settings", { cache: "no-store" }); const result = await response.json(); if (!response.ok) return setError(result.error || "Unable to load delivery settings."); setSettings(result.settings || { free_shipping_threshold: 999, standard_shipping_amount: 90, currency_code: "INR", delivery_message: "Fast & Secure Delivery" }); }
+  const [saving, setSaving] = useState(false);
+
+  async function load() {
+    const response = await fetch("/api/admin/delivery-settings", { cache: "no-store" });
+    const result = await response.json();
+    if (!response.ok) return setError(result.error || "Unable to load delivery settings.");
+    setSettings(normalizeDeliverySettings(result.settings));
+  }
+
   useEffect(() => { load(); }, []);
-  async function save(event) { event.preventDefault(); const body = Object.fromEntries(new FormData(event.currentTarget)); const response = await fetch("/api/admin/delivery-settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const result = await response.json(); if (!response.ok) return setError(result.error || "Unable to save delivery settings."); notifyStorefrontUpdate("content"); setSettings(result.settings); setMessage("Delivery settings saved."); setError(""); }
-  if (!settings) return <p className="p-8 text-sm text-stone-500">Loading delivery settings...</p>;
-  return <section className="max-w-3xl overflow-hidden rounded-2xl border bg-white shadow-sm"><div className="border-b px-5 py-5 sm:px-7"><p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gold-dark">Fulfilment</p><h2 className="mt-1 text-2xl font-bold">Delivery Settings</h2><p className="mt-1 text-sm text-stone-500">These amounts are used by checkout and server-side order calculation.</p></div><form onSubmit={save} className="grid gap-5 p-5 sm:grid-cols-2 sm:p-7"><label className="text-sm font-semibold">Free shipping threshold<input name="free_shipping_threshold" type="number" min="0" step="0.01" required defaultValue={settings.free_shipping_threshold} className={inputClass} /></label><label className="text-sm font-semibold">Standard shipping amount<input name="standard_shipping_amount" type="number" min="0" step="0.01" required defaultValue={settings.standard_shipping_amount} className={inputClass} /></label><label className="text-sm font-semibold">Currency code<input name="currency_code" required maxLength={3} defaultValue={settings.currency_code} className={inputClass} /></label><label className="text-sm font-semibold">Delivery message<input name="delivery_message" required defaultValue={settings.delivery_message} className={inputClass} /></label>{error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700 sm:col-span-2">{error}</p>}{message && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700 sm:col-span-2">{message}</p>}<button className="flex items-center justify-center gap-2 rounded-xl bg-ink px-5 py-3 text-sm font-semibold text-white sm:col-span-2"><Truck size={16} /> Save Settings</button></form></section>;
+
+  function updateSetting(field, value) {
+    setSettings((current) => ({ ...current, [field]: value }));
+    setMessage("");
+    setError("");
+  }
+
+  function toggleOption(field) {
+    const nextValue = !settings[field];
+    const otherField = field === "prepaid_enabled" ? "cod_enabled" : "prepaid_enabled";
+    if (!nextValue && !settings[otherField]) {
+      setError("Keep at least one delivery option enabled.");
+      return;
+    }
+    updateSetting(field, nextValue);
+  }
+
+  async function save(event) {
+    event.preventDefault();
+    setSaving(true);
+    setMessage("");
+    setError("");
+    const formValues = Object.fromEntries(new FormData(event.currentTarget));
+    const body = { ...settings, ...formValues, prepaid_enabled: settings.prepaid_enabled, cod_enabled: settings.cod_enabled };
+    const response = await fetch("/api/admin/delivery-settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const result = await response.json();
+    setSaving(false);
+    if (!response.ok) return setError(result.error || "Unable to save delivery settings.");
+    notifyStorefrontUpdate("content");
+    setSettings(normalizeDeliverySettings(result.settings));
+    setMessage("Delivery settings saved and checkout updated.");
+  }
+
+  if (!settings) return error ? <p role="alert" className="rounded-xl bg-red-50 p-5 text-sm text-red-700">{error} Run <code>supabase/queries/delivery-settings-options.sql</code> in the Supabase SQL Editor, then reload this page.</p> : <p className="p-8 text-sm text-stone-500">Loading delivery settings...</p>;
+
+  return (
+    <section className="max-w-5xl overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-sm">
+      <div className="border-b border-stone-200 px-5 py-5 sm:px-7">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-gold-dark">Fulfilment</p>
+        <h2 className="mt-1 text-2xl font-bold">Shipping Operations</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-500">Configure separate delivery charges, free-shipping thresholds, and availability for prepaid and Cash on Delivery orders.</p>
+      </div>
+      <form onSubmit={save} className="p-5 sm:p-7">
+        <div>
+          <DeliveryOptionCard
+            icon={CreditCard}
+            title="Prepaid / Pay Online"
+            description="Customers pay securely through Razorpay."
+            enabled={settings.prepaid_enabled}
+            toggle={() => toggleOption("prepaid_enabled")}
+            onChange={(event) => updateSetting(event.target.name, event.target.value)}
+            chargeName="prepaid_shipping_amount"
+            chargeValue={settings.prepaid_shipping_amount}
+            thresholdName="prepaid_free_shipping_threshold"
+            thresholdValue={settings.prepaid_free_shipping_threshold}
+            optionLabel="prepaid"
+          />
+          <DeliveryOptionCard
+            icon={Banknote}
+            title="Cash on Delivery"
+            description="Customers pay when the order arrives."
+            enabled={settings.cod_enabled}
+            toggle={() => toggleOption("cod_enabled")}
+            onChange={(event) => updateSetting(event.target.name, event.target.value)}
+            chargeName="cod_shipping_amount"
+            chargeValue={settings.cod_shipping_amount}
+            thresholdName="cod_free_shipping_threshold"
+            thresholdValue={settings.cod_free_shipping_threshold}
+            optionLabel="COD"
+          />
+        </div>
+        <p className="mt-5 text-sm text-stone-500">Free-shipping thresholds are checked against the item subtotal before any coupon discount. At least one payment option must remain enabled.</p>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <label className="text-sm font-semibold text-stone-700">Currency code<input name="currency_code" required maxLength={3} value={settings.currency_code} onChange={(event) => updateSetting("currency_code", event.target.value.toUpperCase())} className={inputClass} /></label>
+          <label className="text-sm font-semibold text-stone-700">Delivery message<input name="delivery_message" required value={settings.delivery_message} onChange={(event) => updateSetting("delivery_message", event.target.value)} className={inputClass} /></label>
+        </div>
+        {error && <p role="alert" className="mt-5 rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+        {message && <p role="status" className="mt-5 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700">{message}</p>}
+        <button type="submit" disabled={saving} className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-gold hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"><Save size={16} /> {saving ? "Saving..." : "Save delivery settings"}</button>
+      </form>
+    </section>
+  );
 }
