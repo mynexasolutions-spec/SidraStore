@@ -32,6 +32,8 @@ Migration 018 enables guest COD and Razorpay checkout. Guest orders reuse an exi
 
 Migration 019 records idempotent cart-add activity for authenticated customers. The Admin Panel reads these records through its protected admin API; the Supabase Realtime publication is enabled for the notification table so server-side subscribers can receive inserts without exposing customer details to anonymous storefront clients.
 
+For Vercel deployments, configure `SHIPMOZO_API_BASE_URL`, `SHIPMOZO_PUBLIC_KEY`, `SHIPMOZO_PRIVATE_KEY`, and `SHIPMOZO_PICKUP_ADDRESS_ID` as Production server-side environment variables before using the Admin Panel's AWB actions. Redeploy after changing environment variables. `CRON_SECRET` protects the scheduled tracking sync endpoint.
+
 After creating an administrator in Supabase Auth, edit and run `queries/bootstrap_admin.sql` once with that account's email. The query deliberately fails while the placeholder remains unchanged.
 
 The current `/admin` login continues to use server-only `ADMIN_EMAIL` and `ADMIN_PASSWORD` values from `.env`. The Supabase authorization tables and policies are ready for a later migration to Supabase Auth without exposing the service-role key to the browser.
