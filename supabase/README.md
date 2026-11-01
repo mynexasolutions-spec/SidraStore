@@ -38,5 +38,5 @@ After creating an administrator in Supabase Auth, edit and run `queries/bootstra
 
 The current `/admin` login continues to use server-only `ADMIN_EMAIL` and `ADMIN_PASSWORD` values from `.env`. The Supabase authorization tables and policies are ready for a later migration to Supabase Auth without exposing the service-role key to the browser.
 
-Never place Supabase service-role credentials, admin passwords, or real user identifiers in these SQL files.
+
 
