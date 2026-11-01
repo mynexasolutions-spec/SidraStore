@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/shipmozo/sync",
-      "schedule": "*/10 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
